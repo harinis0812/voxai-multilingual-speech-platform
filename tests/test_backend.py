@@ -272,3 +272,73 @@ def test_missing_api_key_configuration():
         response = client.post("/api/tts", json={"text": "Test text"})
     assert response.status_code == 500
     assert "not configured" in response.json()["detail"]
+
+
+# ==============================================================================
+# 5. MALAYALAM (ml-IN) & BENCHMARK SAMPLES TESTS
+# ==============================================================================
+@patch("requests.post")
+def test_stt_malayalam_mock(mock_post):
+    """Test STT endpoint with Malayalam language_code."""
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "success": True,
+        "transcript": "നമസ്കാരം, സുഖമാണോ?",
+        "model": "prisma-v3.0",
+        "detected_language_code": "ml-IN",
+        "processing_time": 0.08,
+        "end_to_end_latency": 0.12,
+        "request_id": "mock_req_ml"
+    }
+    mock_post.return_value = mock_resp
+
+    wav_bytes = make_dummy_wav(duration_seconds=2.0)
+    with patch("backend.config.get_api_key", return_value="mock_api_key"):
+        response = client.post(
+            "/api/stt",
+            files={"file": ("audio.wav", wav_bytes, "audio/wav")},
+            data={"language_code": "ml-IN"}
+        )
+
+    assert response.status_code == 200
+    res_data = response.json()
+    assert res_data["success"] is True
+    assert res_data["transcript"] == "നമസ്കാരം, സുഖമാണോ?"
+    assert res_data["detected_language_code"] == "ml-IN"
+    assert res_data["requested_language_code"] == "ml-IN"
+
+
+@patch("requests.post")
+def test_tts_malayalam_mock(mock_post):
+    """Test TTS endpoint with Malayalam text and script alignment."""
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.headers = {"Content-Type": "audio/wav"}
+    mock_resp.content = make_dummy_wav(duration_seconds=2.0)
+    mock_post.return_value = mock_resp
+
+    payload = {
+        "text": "നമസ്കാരം, സുഖമാണോ?",
+        "voice": "Lakshmi",
+        "language": "ml-IN",
+        "speed": 1.0
+    }
+
+    with patch("backend.config.get_api_key", return_value="mock_api_key"):
+        response = client.post("/api/tts", json=payload)
+
+    assert response.status_code == 200
+    assert response.headers["Content-Type"] == "audio/wav"
+    assert len(response.content) > 0
+
+
+def test_get_sample_audio_endpoints():
+    """Test /api/samples endpoints return valid audio streams."""
+    response = client.get("/api/samples/recording")
+    assert response.status_code == 200
+    assert response.headers["Content-Type"] == "audio/wav"
+    assert len(response.content) > 0
+
+    response_404 = client.get("/api/samples/nonexistent_language")
+    assert response_404.status_code == 404

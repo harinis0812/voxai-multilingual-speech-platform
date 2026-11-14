@@ -44,3 +44,4 @@ verified_audio/
 # Generated audit reports
 audit_results_39.json
 verified_live_investigation.json
+scratch/

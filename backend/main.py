@@ -52,7 +52,7 @@ class TTSRequest(BaseModel):
     )
     language: Optional[str] = Field(
         default=config.TTS_DEFAULT_LANGUAGE,
-        description="Language code (e.g., 'ta-IN', 'en-IN', 'hi-IN').",
+        description="Language code (e.g., 'ta-IN', 'en-IN', 'hi-IN', 'ml-IN').",
         json_schema_extra={"example": "ta-IN"}
     )
     speed: Optional[float] = Field(
@@ -186,6 +186,50 @@ def text_to_speech(request: TTSRequest):
         media_type="audio/wav",
         headers={
             "Content-Disposition": "attachment; filename=synthesized_speech.wav",
+            "Content-Type": "audio/wav"
+        }
+    )
+
+
+@app.get(
+    "/api/samples/{sample_name}",
+    summary="Retrieve Reference Benchmark Audio",
+    responses={
+        200: {
+            "content": {"audio/wav": {}},
+            "description": "Returns verified audio sample WAV stream."
+        }
+    }
+)
+def get_sample_audio(sample_name: str):
+    """
+    Returns verified benchmark audio samples for Hindi, Malayalam, Tamil, English, or the original recording.
+    """
+    base_dir = os.path.dirname(os.path.dirname(__file__))
+    sample_map = {
+        "hindi": os.path.join(base_dir, "verified_audio", "hindi_avinash.wav"),
+        "malayalam": os.path.join(base_dir, "verified_audio", "malayalam_lakshmi.wav"),
+        "tamil": os.path.join(base_dir, "verified_audio", "tamil_lakshmi.wav"),
+        "english": os.path.join(base_dir, "verified_audio", "english_shivani.wav"),
+        "recording": os.path.join(base_dir, "recording.wav")
+    }
+
+    file_path = sample_map.get(sample_name.lower())
+    if not file_path or not os.path.exists(file_path):
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Sample audio '{sample_name}' not found."
+        )
+
+    with open(file_path, "rb") as f:
+        content = f.read()
+
+    return Response(
+        content=content,
+        media_type="audio/wav",
+        headers={
+            "Content-Disposition": f"attachment; filename={sample_name}_sample.wav",
             "Content-Type": "audio/wav"
         }
     )

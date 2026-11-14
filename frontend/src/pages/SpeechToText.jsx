@@ -17,14 +17,15 @@ import {
   ArrowRight,
   RefreshCw
 } from "lucide-react";
-import { transcribeAudio } from "../api";
+import { transcribeAudio, fetchSampleAudio } from "../api";
 
 export default function SpeechToText({ addToast }) {
   const [file, setFile] = useState(null);
   const [fileDuration, setFileDuration] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [language, setLanguage] = useState("ta-IN");
+  const [language, setLanguage] = useState("indic-auto");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoadingSample, setIsLoadingSample] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
@@ -36,13 +37,46 @@ export default function SpeechToText({ addToast }) {
 
   const supportedLanguages = [
     { code: "indic-auto", label: "Auto-Detect Language (indic-auto - Recommended)" },
-    { code: "ta-IN", label: "Tamil (தமிழ்)" },
     { code: "hi-IN", label: "Hindi (हिन्दी)" },
+    { code: "ml-IN", label: "Malayalam (മലയാളം)" },
+    { code: "ta-IN", label: "Tamil (தமிழ்)" },
     { code: "en-IN", label: "Indian English" },
     { code: "kn-IN", label: "Kannada (ಕನ್ನಡ)" },
     { code: "te-IN", label: "Telugu (తెలుగు)" },
     { code: "mr-IN", label: "Marathi (मराठी)" },
   ];
+
+  const sampleAudios = [
+    { label: "Hindi Audio", lang: "hi-IN", key: "hindi" },
+    { label: "Malayalam Audio", lang: "ml-IN", key: "malayalam" },
+    { label: "Tamil Audio", lang: "ta-IN", key: "tamil" },
+    { label: "English Audio", lang: "en-IN", key: "english" },
+    { label: "English recording.wav", lang: "hi-IN", key: "recording", tag: "Mismatch Demo" },
+  ];
+
+  const handleLoadSample = async (sample) => {
+    setIsLoadingSample(true);
+    setError(null);
+    setResult(null);
+    try {
+      const sampleFile = await fetchSampleAudio(sample.key);
+      processSelectedFile(sampleFile);
+      setLanguage(sample.lang);
+      addToast({
+        type: "info",
+        title: "Sample Loaded",
+        message: `Loaded ${sample.label} (Set language: ${sample.lang}).`,
+      });
+    } catch (err) {
+      addToast({
+        type: "error",
+        title: "Failed to Load Sample",
+        message: err.message,
+      });
+    } finally {
+      setIsLoadingSample(false);
+    }
+  };
 
   // Handle selected file and read duration via HTML5 Audio
   const processSelectedFile = (selectedFile) => {
@@ -217,6 +251,27 @@ export default function SpeechToText({ addToast }) {
 
       {/* MAIN CARD: UPLOAD & CONFIGURATION */}
       <div className="glass-panel rounded-2xl p-6 sm:p-8 border border-white/[0.08] space-y-6">
+        {/* Preset Sample Audio Quick Pills */}
+        <div className="flex items-center space-x-2 overflow-x-auto pb-1 text-xs">
+          <span className="text-slate-400 font-medium shrink-0">Benchmark Samples:</span>
+          {sampleAudios.map((sample, idx) => (
+            <button
+              key={idx}
+              type="button"
+              disabled={isLoadingSample || isProcessing}
+              onClick={() => handleLoadSample(sample)}
+              className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 hover:text-white border border-white/[0.06] shrink-0 transition-colors flex items-center space-x-1.5"
+            >
+              <span>{sample.label}</span>
+              {sample.tag && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">
+                  {sample.tag}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         {/* DRAG & DROP ZONE */}
         <div
           onDragOver={handleDragOver}
@@ -434,8 +489,21 @@ export default function SpeechToText({ addToast }) {
               </p>
             </div>
 
-            {/* Language mismatch notice if acoustic detector differs from user selection */}
-            {result.detected_language_code && result.detected_language_code !== (result.requested_language_code || language) && (
+            {/* 1. Successful Auto-Detection Banner */}
+            {result.detected_language_code && (result.requested_language_code === "indic-auto" || language === "indic-auto") && (
+              <div className="flex items-start space-x-2.5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
+                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
+                <div>
+                  <span className="font-semibold">Auto-Detection Successful: </span>
+                  Prisma v3.0 automatically identified the spoken language as <strong>{result.detected_language_code}</strong>.
+                </div>
+              </div>
+            )}
+
+            {/* 2. Language Mismatch Warning (only when a specific language was requested, NOT indic-auto) */}
+            {result.detected_language_code &&
+              (result.requested_language_code || language) !== "indic-auto" &&
+              result.detected_language_code !== (result.requested_language_code || language) && (
               <div className="flex items-start space-x-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
                 <div>
@@ -446,10 +514,17 @@ export default function SpeechToText({ addToast }) {
             )}
 
             {/* Metadata strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2 text-xs">
+              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                <span className="text-slate-500 block text-[11px]">Requested Language</span>
+                <span className="font-semibold text-slate-300 font-mono mt-0.5 block truncate">
+                  {result.requested_language_code || language}
+                </span>
+              </div>
+
               <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
                 <span className="text-slate-500 block text-[11px]">Detected Language</span>
-                <span className="font-semibold text-violet-300 font-mono mt-0.5 block">
+                <span className="font-semibold text-violet-300 font-mono mt-0.5 block truncate">
                   {result.detected_language_code || language}
                 </span>
               </div>

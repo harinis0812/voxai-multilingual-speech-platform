@@ -6,6 +6,7 @@ Handles validation, duration calculation, and HTTP communication with Gnani Pris
 import io
 import wave
 import json
+import struct
 import requests
 from fastapi import HTTPException, status
 from backend import config
@@ -15,12 +16,32 @@ def check_audio_duration(file_bytes: bytes) -> float | None:
     """
     Inspects in-memory WAV bytes using Python's standard `wave` module.
     Returns duration in seconds, or None if the audio cannot be parsed as PCM WAV.
+    Handles streaming WAV headers (0xFFFFFFFF) by normalizing chunk sizes and bounding frame counts.
     """
     try:
+        data = bytearray(file_bytes)
+        if len(data) >= 44 and data[:4] == b"RIFF" and data[8:12] == b"WAVE":
+            riff_size = struct.unpack("<I", data[4:8])[0]
+            data_chunk_pos = data.find(b"data", 12)
+            if data_chunk_pos != -1 and (data_chunk_pos + 8) <= len(data):
+                data_size = struct.unpack("<I", data[data_chunk_pos + 4: data_chunk_pos + 8])[0]
+                if riff_size == 0xFFFFFFFF or data_size == 0xFFFFFFFF:
+                    actual_data_size = len(data) - (data_chunk_pos + 8)
+                    actual_riff_size = len(data) - 8
+                    data[4:8] = struct.pack("<I", actual_riff_size)
+                    data[data_chunk_pos + 4: data_chunk_pos + 8] = struct.pack("<I", actual_data_size)
+                    file_bytes = bytes(data)
+
         with wave.open(io.BytesIO(file_bytes), "rb") as wf:
             frames = wf.getnframes()
             rate = wf.getframerate()
-            if rate > 0:
+            channels = wf.getnchannels()
+            sampwidth = wf.getsampwidth()
+            frame_size = channels * sampwidth
+            if rate > 0 and frame_size > 0:
+                max_possible_frames = (len(file_bytes) - 44) // frame_size
+                if frames > max_possible_frames:
+                    frames = max_possible_frames
                 return frames / float(rate)
     except Exception:
         return None

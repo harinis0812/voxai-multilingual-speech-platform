@@ -37,26 +37,27 @@ export default function TextToSpeech({ addToast }) {
   const [audioSize, setAudioSize] = useState(null);
   const audioRef = useRef(null);
 
-  // Official Timbre v3.0 supported voices with persona details
+  // Official Timbre v3.0 supported voices with persona details and verified language compatibility
   const supportedVoices = [
-    { name: "Avinash", gender: "Male", desc: "Confident & Deep (Hindi / English / Indic)" },
-    { name: "Lakshmi", gender: "Female", desc: "Expressive & Warm (Tamil / Indic)" },
-    { name: "Shivani", gender: "Female", desc: "Professional & Melodic (English / Hindi / Indic)" },
-    { name: "Shubham", gender: "Male", desc: "Energetic & Modern (Hindi / Indic)" },
-    { name: "Kalpana", gender: "Female", desc: "Clear & Articulate (Indic / English)" },
-    { name: "Prakash", gender: "Male", desc: "Authoritative & Formal (Indic / Tamil)" },
-    { name: "Devansh", gender: "Male", desc: "Conversational & Natural (Hindi / Indic)" },
-    { name: "Yashraj", gender: "Male", desc: "Dynamic & Resonant (English / Hindi / Indic)" },
-    { name: "Chetana", gender: "Female", desc: "Friendly & Enthusiastic (English / Indic)" },
-    { name: "Vasudha", gender: "Female", desc: "Gentle & Calm (Indic)" },
-    { name: "Harshad", gender: "Male", desc: "Corporate & Crisp (Indic)" },
-    { name: "Riyaa", gender: "Female", desc: "Youthful & Bright (Indic)" },
-    { name: "Tarika", gender: "Female", desc: "Smooth & Engaging (Tamil / Indic)" },
+    { name: "Avinash", gender: "Male", desc: "Confident & Deep (Hindi / English / Indic)", langs: ["hi-IN", "en-IN", "ta-IN", "ml-IN"] },
+    { name: "Lakshmi", gender: "Female", desc: "Expressive & Warm (Tamil / Malayalam / Indic)", langs: ["ta-IN", "ml-IN", "hi-IN", "en-IN"] },
+    { name: "Shivani", gender: "Female", desc: "Professional & Melodic (English / Hindi / Indic)", langs: ["en-IN", "hi-IN", "ta-IN"] },
+    { name: "Shubham", gender: "Male", desc: "Energetic & Modern (Hindi / Indic)", langs: ["hi-IN", "en-IN", "ta-IN"] },
+    { name: "Kalpana", gender: "Female", desc: "Clear & Articulate (Indic / Malayalam / English)", langs: ["ml-IN", "ta-IN", "hi-IN", "en-IN"] },
+    { name: "Prakash", gender: "Male", desc: "Authoritative & Formal (Indic / Tamil / Malayalam)", langs: ["ml-IN", "ta-IN", "hi-IN", "en-IN"] },
+    { name: "Devansh", gender: "Male", desc: "Conversational & Natural (Hindi / Malayalam / Indic)", langs: ["ml-IN", "hi-IN", "ta-IN", "en-IN"] },
+    { name: "Yashraj", gender: "Male", desc: "Dynamic & Resonant (English / Malayalam / Indic)", langs: ["ml-IN", "en-IN", "hi-IN", "ta-IN"] },
+    { name: "Chetana", gender: "Female", desc: "Friendly & Enthusiastic (English / Malayalam / Indic)", langs: ["ml-IN", "en-IN", "hi-IN", "ta-IN"] },
+    { name: "Vasudha", gender: "Female", desc: "Gentle & Calm (Malayalam / Indic)", langs: ["ml-IN", "hi-IN", "ta-IN", "en-IN"] },
+    { name: "Harshad", gender: "Male", desc: "Corporate & Crisp (Indic)", langs: ["hi-IN", "en-IN", "ta-IN"] },
+    { name: "Riyaa", gender: "Female", desc: "Youthful & Bright (Malayalam / Indic)", langs: ["ml-IN", "hi-IN", "ta-IN", "en-IN"] },
+    { name: "Tarika", gender: "Female", desc: "Smooth & Engaging (Tamil / Malayalam / Indic)", langs: ["ml-IN", "ta-IN", "hi-IN", "en-IN"] },
   ];
 
   const supportedLanguages = [
-    { code: "ta-IN", label: "Tamil (தமிழ்)" },
     { code: "hi-IN", label: "Hindi (हिन्दी)" },
+    { code: "ml-IN", label: "Malayalam (മലയാളം)" },
+    { code: "ta-IN", label: "Tamil (தமிழ்)" },
     { code: "en-IN", label: "Indian English" },
     { code: "kn-IN", label: "Kannada (ಕನ್ನಡ)" },
     { code: "te-IN", label: "Telugu (తెలుగు)" },
@@ -69,6 +70,12 @@ export default function TextToSpeech({ addToast }) {
       lang: "hi-IN",
       voice: "Avinash",
       text: "नमस्ते, आप कैसे हैं?",
+    },
+    {
+      label: "Malayalam Sample",
+      lang: "ml-IN",
+      voice: "Lakshmi",
+      text: "നമസ്കാരം, സുഖമാണോ?",
     },
     {
       label: "Indian English",
@@ -90,10 +97,10 @@ export default function TextToSpeech({ addToast }) {
     for (let ch of input) {
       const code = ch.charCodeAt(0);
       if (code >= 0x0900 && code <= 0x097F) return "hi-IN";
+      if (code >= 0x0D00 && code <= 0x0D7F) return "ml-IN";
       if (code >= 0x0B80 && code <= 0x0BFF) return "ta-IN";
       if (code >= 0x0C00 && code <= 0x0C7F) return "te-IN";
       if (code >= 0x0C80 && code <= 0x0CFF) return "kn-IN";
-      if (code >= 0x0D00 && code <= 0x0D7F) return "ml-IN";
       if (code >= 0x0980 && code <= 0x09FF) return "bn-IN";
       if (code >= 0x0A80 && code <= 0x0AFF) return "gu-IN";
     }
@@ -108,15 +115,30 @@ export default function TextToSpeech({ addToast }) {
     const autoLang = detectScriptLanguage(val);
     if (autoLang && autoLang !== language) {
       setLanguage(autoLang);
-      if (autoLang === "hi-IN" && voice === "Lakshmi") {
+      if (autoLang === "hi-IN" && (voice === "Lakshmi" || voice === "Prakash")) {
         setVoice("Avinash");
       } else if (autoLang === "en-IN" && voice === "Lakshmi") {
         setVoice("Shivani");
       } else if (autoLang === "ta-IN" && (voice === "Avinash" || voice === "Shivani")) {
         setVoice("Lakshmi");
+      } else if (autoLang === "ml-IN" && (voice === "Shivani" || voice === "Shubham" || voice === "Harshad")) {
+        setVoice("Lakshmi");
       }
     }
   };
+
+  const handleLanguageChange = (newLang) => {
+    setLanguage(newLang);
+    // If switching to Malayalam and current voice is not in verified list, switch to Lakshmi
+    if (newLang === "ml-IN" && (voice === "Shivani" || voice === "Shubham" || voice === "Harshad")) {
+      setVoice("Lakshmi");
+    }
+  };
+
+  // Filter verified voices for Malayalam specifically
+  const visibleVoices = language === "ml-IN"
+    ? supportedVoices.filter((v) => v.langs.includes("ml-IN"))
+    : supportedVoices;
 
   // Cleanup object URL when component unmounts or audio changes
   useEffect(() => {
@@ -291,7 +313,9 @@ export default function TextToSpeech({ addToast }) {
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
               <span>Voice Persona</span>
-              <span className="text-[11px] text-cyan-400 font-normal">13 Indian Voices</span>
+              <span className="text-[11px] text-cyan-400 font-normal">
+                {language === "ml-IN" ? "10 Verified Voices (ml-IN)" : "13 Indian Voices"}
+              </span>
             </label>
             <select
               value={voice}
@@ -299,7 +323,7 @@ export default function TextToSpeech({ addToast }) {
               disabled={isSynthesizing}
               className="w-full px-3.5 py-2.5 rounded-xl glass-input text-sm cursor-pointer"
             >
-              {supportedVoices.map((v) => (
+              {visibleVoices.map((v) => (
                 <option key={v.name} value={v.name} className="bg-navy-900 text-white">
                   {v.name} ({v.gender}) — {v.desc}
                 </option>
@@ -312,7 +336,7 @@ export default function TextToSpeech({ addToast }) {
             <label className="text-xs font-semibold text-slate-300">Target Language</label>
             <select
               value={language}
-              onChange={(e) => setLanguage(e.target.value)}
+              onChange={(e) => handleLanguageChange(e.target.value)}
               disabled={isSynthesizing}
               className="w-full px-3.5 py-2.5 rounded-xl glass-input text-sm cursor-pointer"
             >

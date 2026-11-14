@@ -74,3 +74,18 @@ export async function synthesizeSpeech(text, voice = "Lakshmi", language = "ta-I
 
   return await response.blob();
 }
+
+/**
+ * Loads a verified reference audio benchmark file from the backend.
+ * @param {string} sampleKey - Sample identifier ('hindi', 'malayalam', 'tamil', 'english', 'recording').
+ * @returns {Promise<File>} - Resolves to File object suitable for dropzone.
+ */
+export async function fetchSampleAudio(sampleKey) {
+  const response = await fetch(`${API_BASE_URL}/api/samples/${sampleKey}`);
+  if (!response.ok) {
+    throw new Error(`Failed to load benchmark audio: HTTP ${response.status}`);
+  }
+  const blob = await response.blob();
+  const filename = `${sampleKey}_reference.wav`;
+  return new File([blob], filename, { type: "audio/wav" });
+}
