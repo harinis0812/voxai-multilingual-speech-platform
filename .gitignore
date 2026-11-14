@@ -1,0 +1,46 @@
+# Environment variables and API secrets
+.env
+.env.*
+!.env.example
+
+# Python cache & virtual environments
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Node.js & Frontend dependencies
+node_modules/
+frontend/node_modules/
+.npm
+*.log
+
+# IDE & Editor folders
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Frontend production build
+frontend/dist/
+
+# Generated audio and test artifacts
+*.wav
+audit_audio_39/
+test_audio_out/
+verified_audio/
+
+# Generated audit reports
+audit_results_39.json
+verified_live_investigation.json

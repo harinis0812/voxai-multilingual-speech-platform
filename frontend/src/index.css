@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  body {
+    background-color: #060913;
+    font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0B101F;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1F2937;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #374151;
+}
+
+/* Glassmorphic Cards & Panels */
+.glass-panel {
+  background: rgba(15, 22, 43, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-panel-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-panel-hover:hover {
+  background: rgba(20, 29, 56, 0.85);
+  border-color: rgba(167, 139, 250, 0.28);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px -10px rgba(139, 92, 246, 0.18);
+}
+
+.glass-input {
+  background: rgba(11, 16, 31, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #F8FAFC;
+  transition: all 0.2s ease;
+}
+
+.glass-input:focus {
+  outline: none;
+  border-color: #8B5CF6;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+  background: rgba(15, 22, 43, 0.95);
+}
+
+/* Subtle glowing accent gradient */
+.gradient-text {
+  background: linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 45%, #C4B5FD 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-text-accent {
+  background: linear-gradient(135deg, #C084FC 0%, #818CF8 50%, #38BDF8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Audio wave bar heights */
+.wave-bar-1 { animation: waveBar 1.1s ease-in-out infinite alternate; }
+.wave-bar-2 { animation: waveBar 0.9s ease-in-out 0.2s infinite alternate; }
+.wave-bar-3 { animation: waveBar 1.3s ease-in-out 0.4s infinite alternate; }
+.wave-bar-4 { animation: waveBar 0.8s ease-in-out 0.1s infinite alternate; }
+.wave-bar-5 { animation: waveBar 1.2s ease-in-out 0.3s infinite alternate; }
+.wave-bar-6 { animation: waveBar 1.0s ease-in-out 0.5s infinite alternate; }
+.wave-bar-7 { animation: waveBar 0.7s ease-in-out 0.2s infinite alternate; }
+.wave-bar-8 { animation: waveBar 1.4s ease-in-out 0.4s infinite alternate; }
+
+@keyframes waveBar {
+  0% { transform: scaleY(0.2); }
+  50% { transform: scaleY(1.0); }
+  100% { transform: scaleY(0.3); }
+}
