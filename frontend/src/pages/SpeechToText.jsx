@@ -1,8 +1,9 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
   Mic,
+  MicOff,
   FileAudio,
   Play,
   Pause,
@@ -15,9 +16,12 @@ import {
   Clock,
   Layers,
   ArrowRight,
-  RefreshCw
+  RefreshCw,
+  Radio,
+  Volume2
 } from "lucide-react";
 import { transcribeAudio, fetchSampleAudio } from "../api";
+import AudioWaveform from "../components/AudioWaveform";
 
 export default function SpeechToText({ addToast }) {
   const [file, setFile] = useState(null);
@@ -35,15 +39,24 @@ export default function SpeechToText({ addToast }) {
   const audioRef = useRef(null);
   const fileInputRef = useRef(null);
 
+  // Microphone recording state
+  const [activeInputTab, setActiveInputTab] = useState("upload"); // "upload" | "record"
+  const [recordingState, setRecordingState] = useState("idle"); // "idle" | "requesting" | "recording" | "stopped"
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const mediaRecorderRef = useRef(null);
+  const recordingStreamRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
+
   const supportedLanguages = [
-    { code: "indic-auto", label: "Auto-Detect Language (indic-auto - Recommended)" },
-    { code: "hi-IN", label: "Hindi (हिन्दी)" },
-    { code: "ml-IN", label: "Malayalam (മലയാളം)" },
-    { code: "ta-IN", label: "Tamil (தமிழ்)" },
-    { code: "en-IN", label: "Indian English" },
-    { code: "kn-IN", label: "Kannada (ಕನ್ನಡ)" },
-    { code: "te-IN", label: "Telugu (తెలుగు)" },
-    { code: "mr-IN", label: "Marathi (मराठी)" },
+    { code: "indic-auto", label: "Auto-Detect Language", native: "indic-auto (Recommended)" },
+    { code: "hi-IN", label: "Hindi", native: "हिन्दी" },
+    { code: "ml-IN", label: "Malayalam", native: "മലയാളം" },
+    { code: "ta-IN", label: "Tamil", native: "தமிழ்" },
+    { code: "en-IN", label: "Indian English", native: "English" },
+    { code: "kn-IN", label: "Kannada", native: "ಕನ್ನಡ" },
+    { code: "te-IN", label: "Telugu", native: "తెలుగు" },
+    { code: "mr-IN", label: "Marathi", native: "मराठी" },
   ];
 
   const sampleAudios = [
@@ -54,6 +67,19 @@ export default function SpeechToText({ addToast }) {
     { label: "English recording.wav", lang: "hi-IN", key: "recording", tag: "Mismatch Demo" },
   ];
 
+  // Clean up recording stream & audio URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+      if (recordingStreamRef.current) {
+        recordingStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleLoadSample = async (sample) => {
     setIsLoadingSample(true);
     setError(null);
@@ -62,10 +88,11 @@ export default function SpeechToText({ addToast }) {
       const sampleFile = await fetchSampleAudio(sample.key);
       processSelectedFile(sampleFile);
       setLanguage(sample.lang);
+      setActiveInputTab("upload");
       addToast({
         type: "info",
-        title: "Sample Loaded",
-        message: `Loaded ${sample.label} (Set language: ${sample.lang}).`,
+        title: "Benchmark Sample Loaded",
+        message: `Loaded ${sample.label} (${sample.lang}). Ready to transcribe.`,
       });
     } catch (err) {
       addToast({
@@ -85,15 +112,12 @@ export default function SpeechToText({ addToast }) {
     setError(null);
     setResult(null);
 
-    // Revoke previous audio preview URL if existing
     if (audioUrl) {
       URL.revokeObjectURL(audioUrl);
       setAudioUrl(null);
     }
 
     setFile(selectedFile);
-
-    // Create object URL for audio preview & duration inspection
     const objectUrl = URL.createObjectURL(selectedFile);
     setAudioUrl(objectUrl);
 
@@ -103,7 +127,7 @@ export default function SpeechToText({ addToast }) {
         setFileDuration(tempAudio.duration);
         if (tempAudio.duration > 30.0) {
           setError(
-            `Audio duration is ${tempAudio.duration.toFixed(1)}s. Gnani AI short-clip REST API enforces a maximum of 30 seconds.`
+            `Audio duration is ${tempAudio.duration.toFixed(1)}s. Gnani AI short-clip REST API enforces a maximum limit of 30.0 seconds.`
           );
         }
       } else {
@@ -163,17 +187,101 @@ export default function SpeechToText({ addToast }) {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+    if (recordingState === "recording") {
+      stopRecording();
+    }
+    setRecordingState("idle");
+    setRecordingSeconds(0);
+  };
+
+  // Start microphone recording using standard browser MediaStream & MediaRecorder
+  const startRecording = async () => {
+    setError(null);
+    setRecordingState("requesting");
+    audioChunksRef.current = [];
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingStreamRef.current = stream;
+
+      // Select mime type
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/ogg";
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        const recordedFile = new File([audioBlob], `mic_recording_${Date.now()}.webm`, {
+          type: mimeType,
+        });
+        processSelectedFile(recordedFile);
+        setRecordingState("stopped");
+        if (recordingStreamRef.current) {
+          recordingStreamRef.current.getTracks().forEach((t) => t.stop());
+          recordingStreamRef.current = null;
+        }
+      };
+
+      mediaRecorder.start(250);
+      setRecordingState("recording");
+      setRecordingSeconds(0);
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => {
+          if (prev >= 29) {
+            stopRecording();
+            return 30;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+
+      addToast({
+        type: "info",
+        title: "Microphone Active",
+        message: "Recording started. Speak into your microphone (max 30s).",
+      });
+    } catch (err) {
+      setRecordingState("idle");
+      setError(
+        "Microphone access denied or not available. Please allow microphone permissions in your browser."
+      );
+      addToast({
+        type: "error",
+        title: "Microphone Error",
+        message: "Could not access microphone.",
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
   };
 
   const handleSubmit = async () => {
     if (!file) {
-      setError("Please select or drop an audio file first.");
+      setError("Please upload an audio file or record speech first.");
       return;
     }
 
     if (fileDuration && fileDuration > 30.0) {
       setError(
-        `Audio duration (${fileDuration.toFixed(1)}s) exceeds the maximum limit of 30 seconds.`
+        `Audio duration (${fileDuration.toFixed(1)}s) exceeds the maximum limit of 30.0 seconds.`
       );
       return;
     }
@@ -187,14 +295,14 @@ export default function SpeechToText({ addToast }) {
       addToast({
         type: "success",
         title: "Transcription Complete",
-        message: "Audio successfully transcribed using Prisma v3.0.",
+        message: "Audio successfully transcribed via Prisma v3.0.",
       });
     } catch (err) {
       const msg = err.message || "Failed to transcribe audio.";
       setError(msg);
       addToast({
         type: "error",
-        title: "STT Failed",
+        title: "Transcription Failed",
         message: msg,
       });
     } finally {
@@ -207,8 +315,8 @@ export default function SpeechToText({ addToast }) {
     navigator.clipboard.writeText(result.transcript);
     addToast({
       type: "info",
-      title: "Copied",
-      message: "Transcript copied to clipboard.",
+      title: "Copied to Clipboard",
+      message: "Transcript text copied.",
     });
   };
 
@@ -218,189 +326,301 @@ export default function SpeechToText({ addToast }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `transcript_${Date.now()}.txt`;
+    a.download = `voxai_transcript_${Date.now()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
     addToast({
       type: "info",
       title: "Downloaded",
-      message: "Transcript saved as text file.",
+      message: "Transcript saved as .txt file.",
     });
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
-      {/* Page Title & Subtitle */}
+    <div className="max-w-5xl mx-auto space-y-8 pb-12">
+      {/* PAGE HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-white flex items-center space-x-2.5">
-            <Mic className="w-6 h-6 text-violet-400" />
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-xs font-semibold text-purple-300 mb-2">
+            <Radio className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+            <span>Neural Speech Recognition</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center space-x-3">
             <span>Speech-to-Text Studio</span>
           </h2>
-          <p className="text-sm text-slate-400 mt-1">
-            Transcribe Indian speech and multilingual recordings using Gnani Prisma v3.0.
+          <p className="text-sm text-purple-200/70 mt-1 max-w-2xl">
+            Transcribe Indian speech, multilingual dialogues, and mixed dialects with acoustic precision using Gnani Prisma v3.0.
           </p>
         </div>
 
-        {/* Model Tag */}
-        <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-xl bg-violet-600/15 border border-violet-500/30 text-xs font-semibold text-violet-300 shrink-0">
-          <Sparkles className="w-3.5 h-3.5" />
+        {/* Model Specs Tag */}
+        <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-xl bg-[#140C2E] border border-purple-500/30 text-xs font-semibold text-purple-200 shrink-0 shadow-glow-sm">
+          <Sparkles className="w-3.5 h-3.5 text-purple-400" />
           <span>Model: prisma-v3.0</span>
         </div>
       </div>
 
-      {/* MAIN CARD: UPLOAD & CONFIGURATION */}
-      <div className="glass-panel rounded-2xl p-6 sm:p-8 border border-white/[0.08] space-y-6">
-        {/* Preset Sample Audio Quick Pills */}
-        <div className="flex items-center space-x-2 overflow-x-auto pb-1 text-xs">
-          <span className="text-slate-400 font-medium shrink-0">Benchmark Samples:</span>
+      {/* BENCHMARK AUDIO SAMPLE SELECTOR CHIPS */}
+      <div className="glass-panel rounded-2xl p-4 sm:p-5 border border-purple-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+        <div className="flex items-center space-x-2 text-xs font-bold text-purple-200 shrink-0">
+          <Sparkles className="w-4 h-4 text-purple-400" />
+          <span>Verified Audio Benchmarks:</span>
+        </div>
+
+        <div className="flex items-center space-x-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
           {sampleAudios.map((sample, idx) => (
             <button
               key={idx}
               type="button"
               disabled={isLoadingSample || isProcessing}
               onClick={() => handleLoadSample(sample)}
-              className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 hover:text-white border border-white/[0.06] shrink-0 transition-colors flex items-center space-x-1.5"
+              className="px-3 py-1.5 rounded-xl bg-purple-900/30 hover:bg-purple-800/40 text-purple-200 hover:text-white border border-purple-500/25 shrink-0 transition-all text-xs font-medium flex items-center space-x-1.5 hover:shadow-glow-sm active:scale-95 disabled:opacity-50"
             >
               <span>{sample.label}</span>
               {sample.tag && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/25 text-amber-300 font-mono border border-amber-500/40">
                   {sample.tag}
                 </span>
               )}
             </button>
           ))}
         </div>
+      </div>
 
-        {/* DRAG & DROP ZONE */}
-        <div
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => !file && fileInputRef.current?.click()}
-          className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-200 cursor-pointer ${
-            isDragging
-              ? "border-violet-500 bg-violet-600/10 scale-[1.01]"
-              : file
-              ? "border-emerald-500/40 bg-emerald-500/[0.03]"
-              : "border-white/[0.12] hover:border-violet-500/40 hover:bg-white/[0.02]"
-          }`}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="audio/*,.wav,.mp3,.ogg,.m4a"
-            onChange={handleFileChange}
-            className="hidden"
-          />
+      {/* MAIN WORKSPACE CARD */}
+      <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-purple-500/20 shadow-2xl space-y-6">
+        {/* INPUT MODE SWITCHER TABS */}
+        <div className="flex items-center space-x-3 border-b border-purple-500/15 pb-4">
+          <button
+            type="button"
+            onClick={() => setActiveInputTab("upload")}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              activeInputTab === "upload"
+                ? "bg-purple-600/30 text-white border border-purple-400/40 shadow-glow-sm"
+                : "text-purple-300/70 hover:text-white hover:bg-white/[0.04]"
+            }`}
+          >
+            <Upload className="w-4 h-4 text-purple-400" />
+            <span>Upload Audio File</span>
+          </button>
 
-          {!file ? (
-            <div className="flex flex-col items-center justify-center space-y-3.5">
-              <div className="w-14 h-14 rounded-2xl bg-violet-600/15 border border-violet-500/30 flex items-center justify-center text-violet-300 shadow-glow-sm">
-                <Upload className="w-6 h-6 animate-bounce" />
-              </div>
+          <button
+            type="button"
+            onClick={() => setActiveInputTab("record")}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+              activeInputTab === "record"
+                ? "bg-purple-600/30 text-white border border-purple-400/40 shadow-glow-sm"
+                : "text-purple-300/70 hover:text-white hover:bg-white/[0.04]"
+            }`}
+          >
+            <Mic className="w-4 h-4 text-purple-400" />
+            <span>Record with Microphone</span>
+          </button>
+        </div>
 
-              <div>
-                <p className="text-sm font-semibold text-white">
-                  Drag and drop your audio recording here, or{" "}
-                  <span className="text-violet-400 underline underline-offset-2">browse files</span>
-                </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  Supports WAV, MP3, OGG, M4A • Maximum duration: 30 seconds
-                </p>
-              </div>
+        {/* TAB 1: FILE UPLOAD ZONE */}
+        {activeInputTab === "upload" && (
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => !file && fileInputRef.current?.click()}
+            className={`relative border-2 border-dashed rounded-2xl p-8 sm:p-10 text-center transition-all duration-200 cursor-pointer ${
+              isDragging
+                ? "border-purple-400 bg-purple-600/15 scale-[1.01] shadow-glow-sm"
+                : file
+                ? "border-emerald-500/40 bg-[#0E0824]/90"
+                : "border-purple-500/25 bg-[#0A061C]/60 hover:border-purple-400/50 hover:bg-purple-900/10"
+            }`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="audio/*,.wav,.mp3,.ogg,.m4a"
+              onChange={handleFileChange}
+              className="hidden"
+            />
 
-              {/* Sample indicator */}
-              <div className="inline-flex items-center space-x-2 text-[11px] text-slate-400 bg-white/[0.04] px-3 py-1 rounded-full border border-white/[0.06]">
-                <span>Tip: You can use the project's</span>
-                <code className="text-violet-300 font-mono">recording.wav</code>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 rounded-xl bg-violet-600/20 border border-violet-500/40 flex items-center justify-center text-violet-300 shrink-0">
-                  <FileAudio className="w-6 h-6" />
+            {!file ? (
+              <div className="flex flex-col items-center justify-center space-y-3.5">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600/30 via-violet-600/20 to-indigo-600/30 border border-purple-500/40 flex items-center justify-center text-purple-300 shadow-glow-sm">
+                  <Upload className="w-7 h-7 text-purple-300 animate-pulse" />
                 </div>
-                <div className="text-left">
-                  <h4 className="text-sm font-semibold text-white truncate max-w-xs sm:max-w-md">
-                    {file.name}
-                  </h4>
-                  <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-400">
-                    <span>{(file.size / (1024 * 1024)).toFixed(2)} MB</span>
-                    <span>•</span>
-                    <span>{file.type || "audio/wav"}</span>
-                    {fileDuration !== null && (
-                      <>
-                        <span>•</span>
-                        <span
-                          className={`font-semibold ${
-                            fileDuration > 30 ? "text-rose-400" : "text-emerald-400"
-                          }`}
-                        >
-                          {fileDuration.toFixed(2)}s {fileDuration > 30 ? "(Over 30s limit!)" : "(Valid)"}
-                        </span>
-                      </>
-                    )}
+
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-white">
+                    Drag and drop your audio clip here, or{" "}
+                    <span className="text-purple-400 underline underline-offset-4 font-bold">browse your computer</span>
+                  </p>
+                  <p className="text-xs text-purple-200/60">
+                    Supports WAV, MP3, OGG, M4A • Maximum duration: 30.0 seconds
+                  </p>
+                </div>
+
+                <div className="inline-flex items-center space-x-2 text-[11px] text-purple-300/80 bg-purple-950/40 px-3.5 py-1 rounded-full border border-purple-500/20">
+                  <span>Tested with</span>
+                  <code className="text-purple-300 font-mono font-bold">recording.wav</code>
+                  <span>& native regional samples</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center space-x-4">
+                  <div className="w-14 h-14 rounded-2xl bg-purple-600/20 border border-purple-500/40 flex items-center justify-center text-purple-300 shrink-0 shadow-glow-sm">
+                    <FileAudio className="w-7 h-7" />
+                  </div>
+                  <div className="text-left">
+                    <h4 className="text-sm font-bold text-white truncate max-w-xs sm:max-w-md">
+                      {file.name}
+                    </h4>
+                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-purple-200/70">
+                      <span>{(file.size / (1024 * 1024)).toFixed(2)} MB</span>
+                      <span>•</span>
+                      <span>{file.type || "audio/wav"}</span>
+                      {fileDuration !== null && (
+                        <>
+                          <span>•</span>
+                          <span
+                            className={`font-semibold ${
+                              fileDuration > 30.0 ? "text-rose-400" : "text-emerald-400"
+                            }`}
+                          >
+                            {fileDuration.toFixed(2)}s {fileDuration > 30.0 ? "(Over 30s limit!)" : "(Valid)"}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Action buttons on file card */}
-              <div className="flex items-center space-x-2 shrink-0">
-                {audioUrl && (
+                {/* File Action Controls */}
+                <div className="flex items-center space-x-2 shrink-0">
+                  {audioUrl && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTogglePlay();
+                      }}
+                      className="p-3 rounded-xl bg-purple-600/25 hover:bg-purple-600/40 text-purple-200 hover:text-white transition-all border border-purple-500/30 shadow-glow-sm"
+                      title={isPlaying ? "Pause audio" : "Play preview"}
+                    >
+                      {isPlaying ? <Pause className="w-4 h-4 text-purple-300" /> : <Play className="w-4 h-4 text-purple-300 ml-0.5" />}
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleTogglePlay();
+                      handleClear();
                     }}
-                    className="p-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-white transition-colors"
-                    title={isPlaying ? "Pause" : "Play preview"}
+                    className="p-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/25 text-rose-300 transition-colors border border-rose-500/20"
+                    title="Remove file"
                   >
-                    {isPlaying ? <Pause className="w-4 h-4 text-violet-400" /> : <Play className="w-4 h-4 text-violet-400" />}
+                    <Trash2 className="w-4 h-4" />
                   </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleClear();
-                  }}
-                  className="p-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors"
-                  title="Remove file"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Hidden Audio Player for Preview */}
-        {audioUrl && (
-          <audio
-            ref={audioRef}
-            src={audioUrl}
-            onEnded={() => setIsPlaying(false)}
-            className="hidden"
-          />
+            )}
+          </div>
         )}
 
-        {/* CONTROLS ROW: LANGUAGE SELECTION & TRANSCRIBE BUTTON */}
+        {/* TAB 2: LIVE MICROPHONE RECORDING */}
+        {activeInputTab === "record" && (
+          <div className="p-8 sm:p-10 rounded-2xl bg-[#0A061C]/80 border border-purple-500/20 flex flex-col items-center justify-center text-center space-y-6">
+            <div className="relative">
+              {recordingState === "recording" && (
+                <div className="absolute inset-0 rounded-full bg-rose-500/30 animate-ping pointer-events-none" />
+              )}
+              <button
+                type="button"
+                onClick={recordingState === "recording" ? stopRecording : startRecording}
+                className={`w-20 h-20 rounded-full flex items-center justify-center transition-all shadow-glow-md active:scale-95 ${
+                  recordingState === "recording"
+                    ? "bg-rose-600 text-white border-2 border-rose-400"
+                    : "bg-gradient-to-tr from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border-2 border-purple-400/50"
+                }`}
+              >
+                {recordingState === "recording" ? (
+                  <MicOff className="w-8 h-8 animate-pulse" />
+                ) : (
+                  <Mic className="w-8 h-8" />
+                )}
+              </button>
+            </div>
+
+            <div className="space-y-1">
+              <h4 className="text-base font-bold text-white">
+                {recordingState === "idle" && "Click to Start Recording"}
+                {recordingState === "requesting" && "Requesting Microphone Access..."}
+                {recordingState === "recording" && "Recording in Progress..."}
+                {recordingState === "stopped" && "Recording Stopped & Audio Attached"}
+              </h4>
+              <p className="text-xs text-purple-200/70">
+                {recordingState === "recording"
+                  ? `Recording time: ${recordingSeconds}s / 30s`
+                  : "Maximum clip length is 30.0 seconds."}
+              </p>
+            </div>
+
+            {/* Live recording timer progress */}
+            {recordingState === "recording" && (
+              <div className="w-full max-w-xs bg-purple-950/60 rounded-full h-2 overflow-hidden border border-purple-500/30">
+                <div
+                  className="bg-rose-500 h-full transition-all duration-300"
+                  style={{ width: `${(recordingSeconds / 30) * 100}%` }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* WAVEFORM VISUALIZER (Reflects actual playback or recording activity) */}
+        {audioUrl && (
+          <div className="p-4 rounded-2xl bg-[#090518]/90 border border-purple-500/20 space-y-2">
+            <div className="flex items-center justify-between text-xs text-purple-200/70 px-2">
+              <span className="flex items-center space-x-1.5">
+                <Volume2 className="w-3.5 h-3.5 text-purple-400" />
+                <span>Audio Activity Waveform</span>
+              </span>
+              <span className="text-[11px] font-mono text-purple-300">
+                {isPlaying ? "Playing Audio Stream" : "Resting Baseline"}
+              </span>
+            </div>
+
+            <AudioWaveform
+              audioRef={audioRef}
+              isPlaying={isPlaying}
+              isRecording={recordingState === "recording"}
+              stream={recordingStreamRef.current}
+              height={56}
+            />
+
+            <audio
+              ref={audioRef}
+              src={audioUrl}
+              onEnded={() => setIsPlaying(false)}
+              className="hidden"
+            />
+          </div>
+        )}
+
+        {/* CONTROLS: LANGUAGE SELECTION & TRANSCRIBE BUTTON */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
           <div className="sm:col-span-1 space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300">Target Language</label>
+            <label className="text-xs font-bold text-purple-200 uppercase tracking-wider">
+              Speech Recognition Language
+            </label>
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
               disabled={isProcessing}
-              className="w-full px-3.5 py-2.5 rounded-xl glass-input text-sm cursor-pointer"
+              className="w-full px-4 py-3 rounded-xl glass-input text-sm cursor-pointer border border-purple-500/25 focus:border-purple-400"
             >
               {supportedLanguages.map((lang) => (
-                <option key={lang.code} value={lang.code} className="bg-navy-900 text-white">
-                  {lang.label} ({lang.code})
+                <option key={lang.code} value={lang.code} className="bg-[#0B0720] text-purple-100">
+                  {lang.label} ({lang.native})
                 </option>
               ))}
             </select>
@@ -410,10 +630,10 @@ export default function SpeechToText({ addToast }) {
             <button
               onClick={handleSubmit}
               disabled={!file || isProcessing || (fileDuration && fileDuration > 30.0)}
-              className={`w-full flex items-center justify-center space-x-2.5 py-2.5 px-6 rounded-xl font-semibold text-sm transition-all shadow-glow-sm ${
+              className={`w-full flex items-center justify-center space-x-2.5 py-3 px-6 rounded-xl font-bold text-sm transition-all shadow-glow-sm ${
                 !file || isProcessing || (fileDuration && fileDuration > 30.0)
-                  ? "bg-white/[0.06] text-slate-500 cursor-not-allowed"
-                  : "bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white active:scale-[0.99]"
+                  ? "bg-white/[0.05] text-purple-300/40 border border-white/[0.06] cursor-not-allowed"
+                  : "bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border border-purple-400/40 shadow-glow-md hover:shadow-glow-lg active:scale-[0.99]"
               }`}
             >
               {isProcessing ? (
@@ -424,23 +644,23 @@ export default function SpeechToText({ addToast }) {
               ) : (
                 <>
                   <Mic className="w-4 h-4" />
-                  <span>Transcribe Audio</span>
+                  <span>Transcribe Audio with Prisma</span>
                 </>
               )}
             </button>
           </div>
         </div>
 
-        {/* ERROR BANNER */}
+        {/* ERROR DISPLAY BANNER */}
         {error && (
           <motion.div
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-start space-x-3 leading-relaxed"
+            className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start space-x-3 leading-relaxed"
           >
             <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <span className="font-semibold text-rose-200">Error: </span>
+              <span className="font-bold text-rose-200">Validation / Service Notice: </span>
               {error}
             </div>
           </motion.div>
@@ -454,27 +674,27 @@ export default function SpeechToText({ addToast }) {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="glass-panel rounded-2xl p-6 sm:p-8 border border-white/[0.08] shadow-2xl space-y-6"
+            className="glass-panel rounded-3xl p-6 sm:p-8 border border-purple-500/30 shadow-2xl space-y-6"
           >
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-white/[0.06] gap-3">
-              <div className="flex items-center space-x-2 text-sm font-semibold text-white">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-purple-500/15 gap-3">
+              <div className="flex items-center space-x-2.5 text-base font-bold text-white">
                 <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                <span>Transcription Result</span>
+                <span>Prisma v3.0 Transcription</span>
               </div>
 
               {/* Action Toolbar */}
               <div className="flex items-center space-x-2">
                 <button
                   onClick={copyToClipboard}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-xs font-medium text-slate-300 hover:text-white transition-colors"
+                  className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-purple-900/30 hover:bg-purple-800/40 border border-purple-500/25 text-xs font-semibold text-purple-200 hover:text-white transition-all shadow-sm active:scale-95"
                 >
-                  <Copy className="w-3.5 h-3.5 text-violet-400" />
-                  <span>Copy</span>
+                  <Copy className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Copy Text</span>
                 </button>
 
                 <button
                   onClick={downloadTranscript}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-xs font-medium text-slate-300 hover:text-white transition-colors"
+                  className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-purple-900/30 hover:bg-purple-800/40 border border-purple-500/25 text-xs font-semibold text-purple-200 hover:text-white transition-all shadow-sm active:scale-95"
                 >
                   <Download className="w-3.5 h-3.5 text-cyan-400" />
                   <span>Download .txt</span>
@@ -482,72 +702,72 @@ export default function SpeechToText({ addToast }) {
               </div>
             </div>
 
-            {/* Transcript text box */}
-            <div className="p-5 rounded-xl bg-navy-950/70 border border-white/[0.06]">
-              <p className="text-base sm:text-lg text-slate-100 font-normal leading-relaxed whitespace-pre-wrap select-text">
-                {result.transcript || <span className="text-slate-500 italic">No speech detected in audio clip.</span>}
+            {/* Transcript Text Container */}
+            <div className="p-6 rounded-2xl bg-[#080418]/90 border border-purple-500/20 shadow-inner">
+              <p className="text-lg sm:text-xl text-[#F1ECFF] font-normal leading-relaxed whitespace-pre-wrap select-text font-sans">
+                {result.transcript || <span className="text-purple-300/40 italic">No audible speech detected in clip.</span>}
               </p>
             </div>
 
             {/* 1. Successful Auto-Detection Banner */}
             {result.detected_language_code && (result.requested_language_code === "indic-auto" || language === "indic-auto") && (
-              <div className="flex items-start space-x-2.5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
+              <div className="flex items-start space-x-2.5 p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-xs text-emerald-200">
                 <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
                 <div>
-                  <span className="font-semibold">Auto-Detection Successful: </span>
-                  Prisma v3.0 automatically identified the spoken language as <strong>{result.detected_language_code}</strong>.
+                  <span className="font-bold text-emerald-100">Auto-Detection Successful: </span>
+                  Prisma v3.0 automatically identified the spoken language as <strong className="text-white font-mono">{result.detected_language_code}</strong>.
                 </div>
               </div>
             )}
 
-            {/* 2. Language Mismatch Warning (only when a specific language was requested, NOT indic-auto) */}
+            {/* 2. Acoustic Language Mismatch Warning */}
             {result.detected_language_code &&
               (result.requested_language_code || language) !== "indic-auto" &&
               result.detected_language_code !== (result.requested_language_code || language) && (
-              <div className="flex items-start space-x-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
+              <div className="flex items-start space-x-2.5 p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-xs text-amber-200">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
                 <div>
-                  <span className="font-semibold">Acoustic Language Mismatch: </span>
-                  Audio was acoustically classified as <strong>{result.detected_language_code}</strong> (requested: <strong>{result.requested_language_code || language}</strong>). Prisma v3.0 transcribed according to the actual spoken speech.
+                  <span className="font-bold text-amber-100">Acoustic Language Mismatch: </span>
+                  Audio was acoustically classified as <strong className="text-white font-mono">{result.detected_language_code}</strong> (requested: <strong className="text-white font-mono">{result.requested_language_code || language}</strong>). Prisma v3.0 transcribed according to the actual spoken speech.
                 </div>
               </div>
             )}
 
-            {/* Metadata strip */}
+            {/* METADATA STRIP */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2 text-xs">
-              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                <span className="text-slate-500 block text-[11px]">Requested Language</span>
-                <span className="font-semibold text-slate-300 font-mono mt-0.5 block truncate">
+              <div className="p-3.5 rounded-xl bg-[#0D0722] border border-purple-500/20">
+                <span className="text-purple-300/60 block text-[11px] font-semibold">Requested Language</span>
+                <span className="font-bold text-purple-100 font-mono mt-1 block truncate">
                   {result.requested_language_code || language}
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                <span className="text-slate-500 block text-[11px]">Detected Language</span>
-                <span className="font-semibold text-violet-300 font-mono mt-0.5 block truncate">
+              <div className="p-3.5 rounded-xl bg-[#0D0722] border border-purple-500/20">
+                <span className="text-purple-300/60 block text-[11px] font-semibold">Detected Language</span>
+                <span className="font-bold text-purple-300 font-mono mt-1 block truncate">
                   {result.detected_language_code || language}
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                <span className="text-slate-500 block text-[11px]">Model</span>
-                <span className="font-semibold text-slate-200 font-mono mt-0.5 block">
+              <div className="p-3.5 rounded-xl bg-[#0D0722] border border-purple-500/20">
+                <span className="text-purple-300/60 block text-[11px] font-semibold">Model</span>
+                <span className="font-bold text-purple-100 font-mono mt-1 block truncate">
                   {result.model || "prisma-v3.0"}
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                <span className="text-slate-500 block text-[11px]">Processing Time</span>
-                <span className="font-semibold text-emerald-400 font-mono mt-0.5 block">
+              <div className="p-3.5 rounded-xl bg-[#0D0722] border border-purple-500/20">
+                <span className="text-purple-300/60 block text-[11px] font-semibold">Processing Time</span>
+                <span className="font-bold text-emerald-400 font-mono mt-1 block">
                   {result.processing_time !== null && result.processing_time !== undefined
                     ? `${Number(result.processing_time).toFixed(2)}s`
                     : "N/A"}
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                <span className="text-slate-500 block text-[11px]">End-to-End Latency</span>
-                <span className="font-semibold text-cyan-400 font-mono mt-0.5 block">
+              <div className="p-3.5 rounded-xl bg-[#0D0722] border border-purple-500/20">
+                <span className="text-purple-300/60 block text-[11px] font-semibold">End-to-End Latency</span>
+                <span className="font-bold text-cyan-400 font-mono mt-1 block">
                   {result.end_to_end_latency !== null && result.end_to_end_latency !== undefined
                     ? `${Number(result.end_to_end_latency).toFixed(2)}s`
                     : "N/A"}
@@ -556,7 +776,7 @@ export default function SpeechToText({ addToast }) {
             </div>
 
             {result.request_id && (
-              <div className="text-[11px] text-slate-500 font-mono text-right truncate">
+              <div className="text-[11px] text-purple-300/50 font-mono text-right truncate">
                 Request ID: {result.request_id}
               </div>
             )}

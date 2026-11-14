@@ -49,10 +49,12 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-navy-950 text-slate-100 flex relative overflow-x-hidden">
-      {/* Background Ambient Ambient Gradient Glows */}
-      <div className="fixed top-0 left-1/3 -translate-x-1/2 w-[700px] h-[400px] bg-violet-600/[0.07] rounded-full blur-[140px] pointer-events-none" />
-      <div className="fixed bottom-0 right-10 w-[500px] h-[350px] bg-cyan-500/[0.05] rounded-full blur-[130px] pointer-events-none" />
+    <div className="min-h-screen bg-[#050312] text-[#F1ECFF] flex relative overflow-x-hidden">
+      {/* Background Ambient Violet & Indigo Glow Blobs (Inspired by VoxAI Glass Design) */}
+      <div className="fixed top-10 -left-20 w-[450px] h-[450px] bg-purple-700/20 rounded-full blur-[120px] pointer-events-none" />
+      <div className="fixed top-48 -right-20 w-[420px] h-[420px] bg-indigo-600/15 rounded-full blur-[130px] pointer-events-none" />
+      <div className="fixed bottom-0 left-1/3 w-[550px] h-[350px] bg-fuchsia-600/10 rounded-full blur-[140px] pointer-events-none" />
+      <div className="bottom-horizon-glow" />
 
       {/* Responsive Sidebar */}
       <Sidebar
@@ -64,7 +66,7 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 lg:pl-72 flex flex-col min-h-screen w-full">
+      <div className="flex-1 lg:pl-72 flex flex-col min-h-screen w-full relative z-10">
         <Header
           activeTab={activeTab}
           setMobileOpen={setMobileOpen}
