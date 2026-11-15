@@ -21,7 +21,7 @@ import {
   Volume2
 } from "lucide-react";
 import { transcribeAudio, fetchSampleAudio } from "../api";
-import AudioWaveform from "../components/AudioWaveform";
+import BipolarWaveform from "../components/BipolarWaveform";
 
 export default function SpeechToText({ addToast }) {
   const [file, setFile] = useState(null);
@@ -566,36 +566,79 @@ export default function SpeechToText({ addToast }) {
 
             {/* Live recording timer progress */}
             {recordingState === "recording" && (
-              <div className="w-full max-w-xs bg-purple-950/60 rounded-full h-2 overflow-hidden border border-purple-500/30">
-                <div
-                  className="bg-rose-500 h-full transition-all duration-300"
-                  style={{ width: `${(recordingSeconds / 30) * 100}%` }}
-                />
+              <div className="w-full max-w-md space-y-3">
+                <div className="w-full bg-purple-950/60 rounded-full h-2 overflow-hidden border border-purple-500/30">
+                  <div
+                    className="bg-rose-500 h-full transition-all duration-300"
+                    style={{ width: `${(recordingSeconds / 30) * 100}%` }}
+                  />
+                </div>
+
+                {/* Live Mic Bipolar Waveform */}
+                <div className="p-3 rounded-2xl bg-[#070314]/90 border border-purple-500/25">
+                  <BipolarWaveform
+                    isRecording={true}
+                    stream={recordingStreamRef.current}
+                    height={80}
+                    showMicBadge={true}
+                    statusLabel="Live Mic Analyser"
+                  />
+                </div>
               </div>
             )}
           </div>
         )}
 
-        {/* WAVEFORM VISUALIZER (Reflects actual playback or recording activity) */}
+        {/* CYBERNETIC AUDIO CONSOLE & BIPOLAR WAVEFORM (Matching STT Reference Image) */}
         {audioUrl && (
-          <div className="p-4 rounded-2xl bg-[#090518]/90 border border-purple-500/20 space-y-2">
-            <div className="flex items-center justify-between text-xs text-purple-200/70 px-2">
-              <span className="flex items-center space-x-1.5">
-                <Volume2 className="w-3.5 h-3.5 text-purple-400" />
-                <span>Audio Activity Waveform</span>
+          <div className="p-5 sm:p-6 rounded-3xl bg-[#080418]/95 border border-purple-500/25 space-y-4 shadow-2xl relative overflow-hidden">
+            {/* Top Status Bar */}
+            <div className="flex items-center justify-between text-xs text-purple-200/80 px-1 border-b border-purple-500/15 pb-3">
+              <span className="flex items-center space-x-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isPlaying ? "bg-cyan-400 opacity-75" : "bg-purple-400 opacity-40"}`}></span>
+                  <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isPlaying ? "bg-cyan-400 shadow-[0_0_8px_#00D2FF]" : "bg-purple-400"}`}></span>
+                </span>
+                <span className="font-semibold text-white">Prisma Cybernetic Audio Console</span>
+                <span className="text-purple-400/60 font-mono text-[11px] hidden sm:inline">• 48 kHz Linear PCM</span>
               </span>
-              <span className="text-[11px] font-mono text-purple-300">
-                {isPlaying ? "Playing Audio Stream" : "Resting Baseline"}
+              <span className="text-[11px] font-mono text-purple-300 bg-purple-950/60 px-2.5 py-0.5 rounded-full border border-purple-500/25">
+                {isPlaying ? "Playback Active" : "Acoustic Baseline Ready"}
               </span>
             </div>
 
-            <AudioWaveform
-              audioRef={audioRef}
-              isPlaying={isPlaying}
-              isRecording={recordingState === "recording"}
-              stream={recordingStreamRef.current}
-              height={56}
-            />
+            {/* Central Bipolar Waveform Display */}
+            <div className="py-2">
+              <BipolarWaveform
+                audioRef={audioRef}
+                isPlaying={isPlaying}
+                height={100}
+                showMicBadge={true}
+                statusLabel="Bipolar ASR Spectrum"
+              />
+            </div>
+
+            {/* Bottom Telemetry HUD Module Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 text-xs">
+              <div className="p-2.5 rounded-xl bg-[#0E0826]/90 border border-purple-500/20 flex flex-col">
+                <span className="text-[10px] uppercase font-bold text-cyan-300/80">Container</span>
+                <span className="text-white font-mono font-semibold mt-0.5">WAV Audio</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-[#0E0826]/90 border border-purple-500/20 flex flex-col">
+                <span className="text-[10px] uppercase font-bold text-cyan-300/80">Sample Rate</span>
+                <span className="text-white font-mono font-semibold mt-0.5">48,000 Hz</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-[#0E0826]/90 border border-purple-500/20 flex flex-col">
+                <span className="text-[10px] uppercase font-bold text-purple-300/80">Channel</span>
+                <span className="text-white font-mono font-semibold mt-0.5">Mono (1.0)</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-[#0E0826]/90 border border-purple-500/20 flex flex-col">
+                <span className="text-[10px] uppercase font-bold text-purple-300/80">Duration</span>
+                <span className={`font-mono font-semibold mt-0.5 ${fileDuration && fileDuration > 30.0 ? "text-rose-400" : "text-emerald-400"}`}>
+                  {fileDuration ? `${fileDuration.toFixed(2)}s / 30s` : "Calculating..."}
+                </span>
+              </div>
+            </div>
 
             <audio
               ref={audioRef}

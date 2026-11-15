@@ -44,13 +44,21 @@
   background: #4C2882;
 }
 
-/* Glassmorphic Panels Inspired by VoxAI Glass Exploration */
+/* Glassmorphic Panels Inspired by VoxAI Glass Exploration (Page 5) */
 .glass-panel {
   background: linear-gradient(160deg, rgba(35, 20, 65, 0.55), rgba(18, 10, 36, 0.65));
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(168, 85, 247, 0.22);
-  box-shadow: 0 8px 32px rgba(5, 3, 18, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  box-shadow: 0 8px 32px rgba(5, 3, 18, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.glass-panel-cyan {
+  background: linear-gradient(160deg, rgba(14, 35, 65, 0.55), rgba(8, 18, 36, 0.65));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  box-shadow: 0 8px 32px rgba(5, 3, 18, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
 .glass-panel-hover {
@@ -61,7 +69,23 @@
   background: linear-gradient(160deg, rgba(50, 30, 90, 0.7), rgba(25, 14, 50, 0.8));
   border-color: rgba(192, 132, 252, 0.45);
   transform: translateY(-3px);
-  box-shadow: 0 16px 40px -10px rgba(168, 85, 247, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-shadow: 0 16px 40px -10px rgba(168, 85, 247, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.laser-baseline {
+  position: relative;
+}
+
+.laser-baseline::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.4) 30%, rgba(168, 85, 247, 0.6) 50%, rgba(217, 70, 239, 0.4) 70%, transparent);
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
+  pointer-events: none;
 }
 
 .glass-input {

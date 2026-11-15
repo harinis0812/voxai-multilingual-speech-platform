@@ -5,16 +5,9 @@ import {
   Volume2,
   Sparkles,
   ArrowRight,
-  ShieldCheck,
-  Zap,
   Globe2,
-  Layers,
-  Cpu,
-  Clock,
   CheckCircle2,
-  Activity,
-  Radio,
-  FileAudio
+  Activity
 } from "lucide-react";
 import AiOrb from "../components/AiOrb";
 
@@ -304,56 +297,6 @@ export default function Dashboard({ setActiveTab, isHealthy }) {
           </div>
         </motion.div>
       </div>
-
-      {/* 4. REAL SYSTEM HIGHLIGHTS / SPECS */}
-      <motion.div
-        variants={item}
-        className="grid grid-cols-2 lg:grid-cols-4 gap-4"
-      >
-        <div className="glass-panel rounded-2xl p-5 border border-purple-500/20">
-          <div className="flex items-center space-x-3 mb-2">
-            <div className="p-2 rounded-xl bg-purple-600/20 text-purple-300">
-              <Cpu className="w-4 h-4" />
-            </div>
-            <span className="text-xs font-semibold text-purple-300/70">STT Engine</span>
-          </div>
-          <div className="text-lg font-bold text-white">Prisma v3.0</div>
-          <p className="text-[11px] text-purple-200/60 mt-0.5">Indic Multilingual Acoustic</p>
-        </div>
-
-        <div className="glass-panel rounded-2xl p-5 border border-purple-500/20">
-          <div className="flex items-center space-x-3 mb-2">
-            <div className="p-2 rounded-xl bg-indigo-600/20 text-indigo-300">
-              <Volume2 className="w-4 h-4" />
-            </div>
-            <span className="text-xs font-semibold text-purple-300/70">TTS Engine</span>
-          </div>
-          <div className="text-lg font-bold text-white">Timbre v3.0</div>
-          <p className="text-[11px] text-purple-200/60 mt-0.5">13 Neural Voice Personas</p>
-        </div>
-
-        <div className="glass-panel rounded-2xl p-5 border border-purple-500/20">
-          <div className="flex items-center space-x-3 mb-2">
-            <div className="p-2 rounded-xl bg-emerald-600/20 text-emerald-300">
-              <Globe2 className="w-4 h-4" />
-            </div>
-            <span className="text-xs font-semibold text-purple-300/70">Language Reach</span>
-          </div>
-          <div className="text-lg font-bold text-white">Indic & English</div>
-          <p className="text-[11px] text-purple-200/60 mt-0.5">Malayalam, Tamil, Hindi, English</p>
-        </div>
-
-        <div className="glass-panel rounded-2xl p-5 border border-purple-500/20">
-          <div className="flex items-center space-x-3 mb-2">
-            <div className="p-2 rounded-xl bg-cyan-600/20 text-cyan-300">
-              <ShieldCheck className="w-4 h-4" />
-            </div>
-            <span className="text-xs font-semibold text-purple-300/70">Backend Service</span>
-          </div>
-          <div className="text-lg font-bold text-white">FastAPI Async</div>
-          <p className="text-[11px] text-purple-200/60 mt-0.5">In-Memory Audio Streaming</p>
-        </div>
-      </motion.div>
     </motion.div>
   );
 }

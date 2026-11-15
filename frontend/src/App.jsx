@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
 import Toast from "./components/Toast";
 import Dashboard from "./pages/Dashboard";
 import SpeechToText from "./pages/SpeechToText";
@@ -95,6 +96,9 @@ export default function App() {
             </motion.div>
           </AnimatePresence>
         </main>
+
+        {/* Global Footer (Contains About VoxAI & API Status links) */}
+        <Footer setActiveTab={setActiveTab} isHealthy={isHealthy} />
       </div>
 
       {/* Toast Notification Container */}

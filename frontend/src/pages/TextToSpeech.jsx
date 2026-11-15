@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { synthesizeSpeech } from "../api";
 import AudioWaveform from "../components/AudioWaveform";
+import NeuralVoiceOrb from "../components/NeuralVoiceOrb";
 
 export default function TextToSpeech({ addToast }) {
   const [text, setText] = useState(
@@ -137,6 +138,8 @@ export default function TextToSpeech({ addToast }) {
   const visibleVoices = language === "ml-IN"
     ? supportedVoices.filter((v) => v.langs.includes("ml-IN"))
     : supportedVoices;
+
+  const currentVoiceObj = supportedVoices.find((v) => v.name === voice) || { gender: "Female", desc: "" };
 
   // Cleanup object URL when component unmounts or audio changes
   useEffect(() => {
@@ -263,152 +266,198 @@ export default function TextToSpeech({ addToast }) {
         </div>
       </div>
 
-      {/* MAIN EDITOR & SYNTHESIS PANEL */}
-      <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-purple-500/20 shadow-2xl space-y-6">
-        {/* Sample text quick pills */}
-        <div className="flex items-center space-x-2 overflow-x-auto pb-1 text-xs scrollbar-none">
-          <span className="text-purple-300/70 font-semibold shrink-0">Preset Samples:</span>
-          {sampleTexts.map((sample, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => {
-                setText(sample.text);
-                setLanguage(sample.lang);
-                setVoice(sample.voice);
-              }}
-              className="px-3.5 py-1.5 rounded-xl bg-purple-900/30 hover:bg-purple-800/40 text-purple-200 hover:text-white border border-purple-500/25 shrink-0 transition-all font-medium active:scale-95 shadow-sm"
-            >
-              {sample.label}
-            </button>
-          ))}
-        </div>
+      {/* MAIN SYNTHESIS STUDIO: CONTROLS & 3D NEURAL ORB */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        {/* Left Column: Script Input & Voice Parameters (lg:col-span-7) */}
+        <div className="lg:col-span-7 glass-panel rounded-3xl p-6 sm:p-8 border border-purple-500/25 shadow-2xl space-y-6 flex flex-col justify-between">
+          <div>
+            {/* Sample text quick pills */}
+            <div className="flex items-center space-x-2 overflow-x-auto pb-2 text-xs scrollbar-none">
+              <span className="text-purple-300/70 font-semibold shrink-0">Preset Samples:</span>
+              {sampleTexts.map((sample, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setText(sample.text);
+                    setLanguage(sample.lang);
+                    setVoice(sample.voice);
+                  }}
+                  className="px-3 py-1 rounded-xl bg-purple-900/30 hover:bg-purple-800/40 text-purple-200 hover:text-white border border-purple-500/25 shrink-0 transition-all font-medium active:scale-95 shadow-sm"
+                >
+                  {sample.label}
+                </button>
+              ))}
+            </div>
 
-        {/* TEXT INPUT AREA */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <label className="font-bold text-purple-200 uppercase tracking-wider">Input Script</label>
-            <span
-              className={`font-mono text-xs ${
-                text.length > 4500 ? "text-amber-400" : "text-purple-300/60"
+            {/* TEXT INPUT AREA */}
+            <div className="space-y-2 mt-2">
+              <div className="flex items-center justify-between text-xs">
+                <label className="font-bold text-purple-200 uppercase tracking-wider">Input Script</label>
+                <span
+                  className={`font-mono text-xs ${
+                    text.length > 4500 ? "text-amber-400" : "text-purple-300/60"
+                  }`}
+                >
+                  {text.length} / 5,000 characters
+                </span>
+              </div>
+
+              <textarea
+                value={text}
+                onChange={handleTextChange}
+                maxLength={5000}
+                rows={5}
+                disabled={isSynthesizing}
+                placeholder="Type or paste the text you want Gnani AI to synthesize..."
+                className="w-full p-4 rounded-2xl glass-input text-base text-[#F1ECFF] placeholder:text-purple-300/40 resize-y leading-relaxed border border-purple-500/25 focus:border-purple-400"
+              />
+            </div>
+
+            {/* CONTROLS GRID: VOICE, LANGUAGE, SPEED */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+              {/* Voice Selector */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-purple-200 flex items-center justify-between uppercase tracking-wider">
+                  <span>Voice Persona</span>
+                  <span className="text-[10px] text-purple-400 font-semibold lowercase">
+                    {language === "ml-IN" ? "10 verified" : "13 voices"}
+                  </span>
+                </label>
+                <select
+                  value={voice}
+                  onChange={(e) => setVoice(e.target.value)}
+                  disabled={isSynthesizing}
+                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-sm cursor-pointer border border-purple-500/25 focus:border-purple-400"
+                >
+                  {visibleVoices.map((v) => (
+                    <option key={v.name} value={v.name} className="bg-[#0B0720] text-purple-100">
+                      {v.name} ({v.gender})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Language Selector */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-purple-200 uppercase tracking-wider">Target Language</label>
+                <select
+                  value={language}
+                  onChange={(e) => handleLanguageChange(e.target.value)}
+                  disabled={isSynthesizing}
+                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-sm cursor-pointer border border-purple-500/25 focus:border-purple-400"
+                >
+                  {supportedLanguages.map((l) => (
+                    <option key={l.code} value={l.code} className="bg-[#0B0720] text-purple-100">
+                      {l.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Speed Selector */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <label className="font-bold text-purple-200 uppercase tracking-wider">Speed</label>
+                  <span className="text-purple-300 font-mono font-bold">{speed.toFixed(2)}x</span>
+                </div>
+                <div className="flex items-center space-x-2 pt-2">
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="2.0"
+                    step="0.25"
+                    value={speed}
+                    onChange={(e) => setSpeed(parseFloat(e.target.value))}
+                    disabled={isSynthesizing}
+                    className="w-full accent-purple-400 cursor-pointer h-2 bg-purple-950/60 rounded-lg"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* GENERATE SPEECH BUTTON */}
+          <div className="pt-4">
+            <button
+              onClick={handleGenerate}
+              disabled={!text.trim() || isSynthesizing}
+              className={`w-full flex items-center justify-center space-x-2.5 py-3.5 px-6 rounded-2xl font-bold text-sm transition-all shadow-glow-sm ${
+                !text.trim() || isSynthesizing
+                  ? "bg-white/[0.05] text-purple-300/40 border border-white/[0.06] cursor-not-allowed"
+                  : "bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border border-purple-400/40 shadow-glow-md hover:shadow-glow-lg active:scale-[0.99]"
               }`}
             >
-              {text.length} / 5,000 characters
+              {isSynthesizing ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                  <span>Synthesizing Voice with Timbre v3.0...</span>
+                </>
+              ) : (
+                <>
+                  <Volume2 className="w-4 h-4" />
+                  <span>Generate Speech with Timbre</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* ERROR BANNER */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start space-x-3 leading-relaxed"
+            >
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <span className="font-bold text-rose-200">Error: </span>
+                {error}
+              </div>
+            </motion.div>
+          )}
+        </div>
+
+        {/* Right Column: Neural Voice Holographic Chamber (lg:col-span-5) */}
+        <div className="lg:col-span-5 glass-panel rounded-3xl p-6 sm:p-7 border border-purple-500/25 shadow-2xl flex flex-col items-center justify-between text-center relative overflow-hidden min-h-[420px]">
+          {/* Top Chamber Header */}
+          <div className="w-full flex items-center justify-between text-xs pb-3 border-b border-purple-500/15">
+            <span className="flex items-center space-x-1.5 font-bold text-white">
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Neural Voice Hologram</span>
+            </span>
+            <span className="font-mono text-[10px] text-cyan-300 bg-cyan-950/60 px-2.5 py-0.5 rounded-full border border-cyan-500/30">
+              Timbre v3.0
             </span>
           </div>
 
-          <textarea
-            value={text}
-            onChange={handleTextChange}
-            maxLength={5000}
-            rows={5}
-            disabled={isSynthesizing}
-            placeholder="Type or paste the text you want Gnani AI to synthesize..."
-            className="w-full p-4 rounded-2xl glass-input text-base text-[#F1ECFF] placeholder:text-purple-300/40 resize-y leading-relaxed border border-purple-500/25 focus:border-purple-400"
-          />
-        </div>
-
-        {/* CONTROLS GRID: VOICE, LANGUAGE, SPEED */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 pt-2">
-          {/* Voice Selector */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-purple-200 flex items-center justify-between uppercase tracking-wider">
-              <span>Voice Persona</span>
-              <span className="text-[11px] text-purple-400 font-semibold lowercase">
-                {language === "ml-IN" ? "10 verified voices" : "13 Indian voices"}
-              </span>
-            </label>
-            <select
-              value={voice}
-              onChange={(e) => setVoice(e.target.value)}
-              disabled={isSynthesizing}
-              className="w-full px-4 py-3 rounded-xl glass-input text-sm cursor-pointer border border-purple-500/25 focus:border-purple-400"
-            >
-              {visibleVoices.map((v) => (
-                <option key={v.name} value={v.name} className="bg-[#0B0720] text-purple-100">
-                  {v.name} ({v.gender}) — {v.desc}
-                </option>
-              ))}
-            </select>
+          {/* 3D Neural Voice Orb with internal dual oscillating sine waves and orbiting ribbons */}
+          <div className="my-auto py-4 flex items-center justify-center">
+            <NeuralVoiceOrb
+              isPlaying={isPlaying}
+              isSynthesizing={isSynthesizing}
+              voiceName={voice}
+              gender={currentVoiceObj.gender}
+              size={220}
+            />
           </div>
 
-          {/* Language Selector */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-purple-200 uppercase tracking-wider">Target Language</label>
-            <select
-              value={language}
-              onChange={(e) => handleLanguageChange(e.target.value)}
-              disabled={isSynthesizing}
-              className="w-full px-4 py-3 rounded-xl glass-input text-sm cursor-pointer border border-purple-500/25 focus:border-purple-400"
-            >
-              {supportedLanguages.map((l) => (
-                <option key={l.code} value={l.code} className="bg-[#0B0720] text-purple-100">
-                  {l.label} ({l.code})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Speed Selector */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs">
-              <label className="font-bold text-purple-200 uppercase tracking-wider">Synthesis Speed</label>
-              <span className="text-purple-300 font-mono font-bold">{speed.toFixed(2)}x</span>
+          {/* Bottom Telemetry Info */}
+          <div className="w-full pt-4 border-t border-purple-500/15 text-xs text-purple-200/70 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-purple-300/60">Voice Profile</span>
+              <span className="font-semibold text-white">{voice} ({currentVoiceObj.gender})</span>
             </div>
-            <div className="flex items-center space-x-3 pt-3">
-              <input
-                type="range"
-                min="0.5"
-                max="2.0"
-                step="0.25"
-                value={speed}
-                onChange={(e) => setSpeed(parseFloat(e.target.value))}
-                disabled={isSynthesizing}
-                className="w-full accent-purple-400 cursor-pointer h-2 bg-purple-950/60 rounded-lg"
-              />
+            <div className="flex items-center justify-between">
+              <span className="text-purple-300/60">Audio Fidelity</span>
+              <span className="font-mono text-cyan-300">48 kHz Linear PCM</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-purple-300/60">Persona Timber</span>
+              <span className="text-purple-300/80 truncate max-w-[180px]">{currentVoiceObj.desc}</span>
             </div>
           </div>
         </div>
-
-        {/* GENERATE SPEECH BUTTON */}
-        <div className="pt-2">
-          <button
-            onClick={handleGenerate}
-            disabled={!text.trim() || isSynthesizing}
-            className={`w-full flex items-center justify-center space-x-2.5 py-3.5 px-6 rounded-2xl font-bold text-sm transition-all shadow-glow-sm ${
-              !text.trim() || isSynthesizing
-                ? "bg-white/[0.05] text-purple-300/40 border border-white/[0.06] cursor-not-allowed"
-                : "bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border border-purple-400/40 shadow-glow-md hover:shadow-glow-lg active:scale-[0.99]"
-            }`}
-          >
-            {isSynthesizing ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                <span>Synthesizing Voice with Timbre v3.0...</span>
-              </>
-            ) : (
-              <>
-                <Volume2 className="w-4 h-4" />
-                <span>Generate Speech with Timbre</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* ERROR BANNER */}
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start space-x-3 leading-relaxed"
-          >
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <span className="font-bold text-rose-200">Error: </span>
-              {error}
-            </div>
-          </motion.div>
-        )}
       </div>
 
       {/* SYNTHESIZED AUDIO PLAYER CARD */}

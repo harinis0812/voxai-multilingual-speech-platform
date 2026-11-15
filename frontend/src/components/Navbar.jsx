@@ -4,8 +4,6 @@ import {
   LayoutGrid,
   Mic,
   Volume2,
-  Activity,
-  Info,
   Radio,
   ExternalLink,
   Menu,
@@ -34,18 +32,6 @@ export default function Navbar({ activeTab, setActiveTab, isHealthy }) {
       label: "Text-to-Speech",
       icon: Volume2,
       badge: "Timbre v3"
-    },
-    {
-      id: "status",
-      label: "API Status",
-      icon: Activity,
-      badge: null
-    },
-    {
-      id: "about",
-      label: "About VoxAI",
-      icon: Info,
-      badge: null
     }
   ];
 
