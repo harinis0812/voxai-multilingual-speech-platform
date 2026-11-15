@@ -398,41 +398,40 @@ HTTP Status: 200
 
 ---
 
-## 17. Production Deployment Guide (Render Unified Service)
+## 17. Production Deployment Guide (Render Blueprint)
 
-VoxAI is engineered for seamless full-stack deployment on **Render** (as well as Railway or Fly.io) using a unified FastAPI architecture where the backend microservice serves both the REST API endpoints and the compiled React single-page application from the same origin.
+VoxAI is configured for automated unified full-stack deployment on **Render** via Infrastructure-as-Code using the root [`render.yaml`](render.yaml) blueprint specification. In this unified architecture, the FastAPI backend serves both the REST API endpoints and the compiled React single-page application from the same origin under HTTPS.
 
-### A. Render Free-Tier Specifications & Characteristics
-- **Instance Resources**: 512 MB RAM, 0.1 shared vCPU (FastAPI + React footprint is ~45 MB, operating comfortably within 512 MB).
-- **Inactivity Spin-Down**: Free tier web services spin down after 15 minutes of inactivity. The initial wake-up request incurs a cold start of ~45–50 seconds.
-- **Instance Hours**: 750 free instance hours per month (sufficient for continuous 24/7 uptime for one web service).
-- **Ephemeral Storage**: In-memory audio streaming ensures zero reliance on persistent disk.
-- **SSL / HTTPS**: Automatically provisioned free TLS certificates. **HTTPS is mandatory** for browser microphone recording (`navigator.mediaDevices.getUserMedia`).
+### Automated Deployment Steps
 
-### B. Deployment via Render Dashboard (Step-by-Step)
-1. **Create Web Service**:
-   - Go to [dashboard.render.com](https://dashboard.render.com) and click **New +** $\rightarrow$ **Web Service**.
-   - Connect your GitHub repository (`VoxAI`).
-2. **Environment & Build Settings**:
-   - **Environment**: `Python 3`
-   - **Branch**: `main` (or `cleanup/voxai-production-ready`)
-   - **Build Command**:
-     ```bash
-     npm --prefix frontend install && npm --prefix frontend run build && pip install -r requirements.txt
-     ```
-   - **Start Command**:
-     ```bash
-     uvicorn backend.main:app --host 0.0.0.0 --port $PORT
-     ```
-3. **Environment Variables**:
-   - `PYTHON_VERSION`: `3.11.9`
-   - `GNANI_API_KEY`: `<your-gnani-vachana-api-key>`
-   - `ALLOWED_ORIGINS`: `*` (or your custom domain)
-4. **Deploy**:
-   - Click **Create Web Service**.
-   - Render will build the React frontend into `frontend/dist/`, install Python packages, and launch Uvicorn.
-   - Access the live application at: `https://<service-name>.onrender.com/` (automatically redirects browser visitors to `/app/`).
-   - Access interactive Swagger docs at: `https://<service-name>.onrender.com/docs`.
+1. **Prerequisite**:
+   - Ensure the production-preparation branch (`cleanup/voxai-production-ready`) is merged into the `main` branch on GitHub.
 
-### C. Infrastructure-as-Code (`render.yaml`)
-Alternatively, deploy using the included `render.yaml` Blueprint directly from the Render dashboard.
+2. **Deploy with Render Blueprint**:
+   - Navigate to the [Render Dashboard](https://dashboard.render.com).
+   - Click **New +** $\rightarrow$ **Blueprint**.
+   - Connect your GitHub repository and select the `main` branch.
+   - Render will detect [`render.yaml`](render.yaml) and automatically configure the `voxai-speech-platform` web service.
+
+3. **Configure Environment Variables**:
+   - Because `render.yaml` specifies `sync: false` for sensitive credentials, Render will prompt for `GNANI_API_KEY`.
+   - Enter your valid Gnani API key securely in the Render environment variables prompt (or under the service's **Environment** tab).
+   - *Never commit your raw API key to Git.*
+
+4. **Service Execution Details**:
+   - Render executes the exact build and start commands defined in `render.yaml`:
+     - **Build Command**:
+       ```bash
+       npm --prefix frontend ci && npm --prefix frontend run build && pip install -r requirements.txt
+       ```
+     - **Start Command**:
+       ```bash
+       uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+       ```
+
+5. **Verify Live Deployment**:
+   - Render automatically provisions free SSL/TLS certificates. **HTTPS is required** for browser microphone recording permissions (`navigator.mediaDevices.getUserMedia`).
+   - Open your deployed service URL:
+     - Web Application: `https://<service-name>.onrender.com/` (browser traffic automatically redirects to `/app/`).
+     - Interactive Swagger API Documentation: `https://<service-name>.onrender.com/docs`.
+     - System Health Endpoint: `https://<service-name>.onrender.com/health`.
