@@ -41,6 +41,8 @@ export default function NeuralVoiceOrb({
     const centerX = w / 2;
     const centerY = h / 2;
 
+    const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+
     const render = () => {
       ctx.clearRect(0, 0, w, h);
 
@@ -150,7 +152,9 @@ export default function NeuralVoiceOrb({
 
       ctx.restore();
 
-      animationFrameRef.current = requestAnimationFrame(render);
+      if (!prefersReducedMotion || isPlaying || isSynthesizing) {
+        animationFrameRef.current = requestAnimationFrame(render);
+      }
     };
 
     render();

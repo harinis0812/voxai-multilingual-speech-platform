@@ -29,10 +29,25 @@ export default function BipolarWaveform({
   const animationFrameRef = useRef(null);
   const phaseRef = useRef(0);
 
+  // Dedicated unmount cleanup for Web Audio API context
+  useEffect(() => {
+    return () => {
+      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+        try {
+          audioContextRef.current.close().catch(() => {});
+        } catch (e) {}
+        audioContextRef.current = null;
+      }
+    };
+  }, []);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
+
+    // Check reduced motion preference
+    const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
 
     // Setup high DPI canvas
     const dpr = window.devicePixelRatio || 1;
@@ -116,6 +131,10 @@ export default function BipolarWaveform({
     };
 
     if (!isPlaying && !isRecording) {
+      if (prefersReducedMotion) {
+        drawResting(0);
+        return;
+      }
       // Resting animation
       let p = phaseRef.current;
       const renderIdle = () => {
