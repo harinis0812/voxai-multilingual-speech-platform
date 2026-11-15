@@ -395,4 +395,43 @@ HTTP Status: 200
 
 - **Streaming WebSocket Support**: Prisma v3.0 and Timbre v3.0 both offer real-time streaming interfaces (`/stt/v3/stream` and `/api/v1/tts/sse`); future updates can add WebSocket handlers for sub-second latency.
 - **Batch Processing**: Support asynchronous batch jobs for files exceeding the 30-second REST limit.
-- **Frontend Dashboard**: A lightweight React or HTML5 interactive dashboard for audio playback and recording.
+
+---
+
+## 17. Production Deployment Guide (Render Blueprint)
+
+VoxAI is configured for automated unified full-stack deployment on **Render** via Infrastructure-as-Code using the root [`render.yaml`](render.yaml) blueprint specification. In this unified architecture, the FastAPI backend serves both the REST API endpoints and the compiled React single-page application from the same origin under HTTPS.
+
+### Automated Deployment Steps
+
+1. **Prerequisite**:
+   - Ensure the production-preparation branch (`cleanup/voxai-production-ready`) is merged into the `main` branch on GitHub.
+
+2. **Deploy with Render Blueprint**:
+   - Navigate to the [Render Dashboard](https://dashboard.render.com).
+   - Click **New +** $\rightarrow$ **Blueprint**.
+   - Connect your GitHub repository and select the `main` branch.
+   - Render will detect [`render.yaml`](render.yaml) and automatically configure the `voxai-speech-platform` web service.
+
+3. **Configure Environment Variables**:
+   - Because `render.yaml` specifies `sync: false` for sensitive credentials, Render will prompt for `GNANI_API_KEY`.
+   - Enter your valid Gnani API key securely in the Render environment variables prompt (or under the service's **Environment** tab).
+   - *Never commit your raw API key to Git.*
+
+4. **Service Execution Details**:
+   - Render executes the exact build and start commands defined in `render.yaml`:
+     - **Build Command**:
+       ```bash
+       npm --prefix frontend ci && npm --prefix frontend run build && pip install -r requirements.txt
+       ```
+     - **Start Command**:
+       ```bash
+       uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+       ```
+
+5. **Verify Live Deployment**:
+   - Render automatically provisions free SSL/TLS certificates. **HTTPS is required** for browser microphone recording permissions (`navigator.mediaDevices.getUserMedia`).
+   - Open your deployed service URL:
+     - Web Application: `https://<service-name>.onrender.com/` (browser traffic automatically redirects to `/app/`).
+     - Interactive Swagger API Documentation: `https://<service-name>.onrender.com/docs`.
+     - System Health Endpoint: `https://<service-name>.onrender.com/health`.

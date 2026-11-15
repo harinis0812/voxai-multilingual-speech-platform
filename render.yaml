@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: voxai-speech-platform
+    runtime: python
+    plan: free
+    buildCommand: "npm --prefix frontend ci && npm --prefix frontend run build && pip install -r requirements.txt"
+    startCommand: "uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: GNANI_API_KEY
+        sync: false

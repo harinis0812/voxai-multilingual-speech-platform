@@ -1,12 +1,17 @@
 /**
  * Gnani AI API Client
- * Connects frontend directly to the FastAPI backend at http://127.0.0.1:8000
+ * Dynamically resolves API base URL for both local development and production.
  */
 
-// Use relative paths when served from backend (e.g. /app), or explicit URL when running on Vite dev server (port 5173)
-const API_BASE_URL = typeof window !== "undefined" && window.location.port === "5173"
-  ? "http://127.0.0.1:8000"
+// If VITE_API_BASE_URL is provided, use it.
+// In local development on Vite dev server (port 5173), target the local backend.
+// In unified production deployment (e.g. served from FastAPI at /app), use relative path "".
+export const API_BASE_URL = typeof window !== "undefined"
+  ? (import.meta.env?.VITE_API_BASE_URL || (window.location.port === "5173" ? "http://127.0.0.1:8000" : ""))
   : "";
+
+// Dynamic OpenAPI Swagger documentation link
+export const DOCS_URL = API_BASE_URL ? `${API_BASE_URL}/docs` : "/docs";
 
 /**
  * Checks backend health and service readiness.

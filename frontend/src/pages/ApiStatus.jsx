@@ -15,7 +15,7 @@ import {
   Radio,
   FileAudio
 } from "lucide-react";
-import { fetchHealth } from "../api";
+import { fetchHealth, API_BASE_URL, DOCS_URL } from "../api";
 
 export default function ApiStatus({ isHealthy, setIsHealthy, addToast }) {
   const [healthData, setHealthData] = useState(null);
@@ -45,7 +45,7 @@ export default function ApiStatus({ isHealthy, setIsHealthy, addToast }) {
       addToast({
         type: "error",
         title: "Connection Failed",
-        message: "Could not reach FastAPI backend at 127.0.0.1:8000.",
+        message: "Could not reach FastAPI backend service.",
       });
     } finally {
       setIsPinging(false);
@@ -104,7 +104,7 @@ export default function ApiStatus({ isHealthy, setIsHealthy, addToast }) {
 
           <div>
             <h4 className="text-base font-bold text-white">FastAPI Backend Core</h4>
-            <p className="text-xs text-purple-300/70 font-mono mt-0.5">http://127.0.0.1:8000</p>
+            <p className="text-xs text-purple-300/70 font-mono mt-0.5">{API_BASE_URL || (typeof window !== "undefined" ? window.location.origin : "FastAPI Service")}</p>
           </div>
 
           <div className="pt-3 text-xs text-purple-300/70 border-t border-purple-500/15 flex items-center justify-between">
@@ -226,7 +226,7 @@ export default function ApiStatus({ isHealthy, setIsHealthy, addToast }) {
           <div className="pt-3 text-[11px] text-purple-300/60 flex items-center justify-between border-t border-purple-500/15">
             <span>Last checked: {lastChecked}</span>
             <a
-              href="http://127.0.0.1:8000/docs"
+              href={DOCS_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="text-purple-400 hover:text-purple-300 flex items-center space-x-1.5 font-semibold transition-colors"

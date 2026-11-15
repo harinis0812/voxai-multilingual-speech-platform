@@ -134,7 +134,7 @@ export default function Dashboard({ setActiveTab, isHealthy }) {
               <span className="text-xs font-semibold text-purple-200">Prisma & Timbre Engine</span>
               <div className="text-[11px] text-purple-300/70 mt-1 flex items-center justify-center space-x-1.5">
                 <span className={`w-2 h-2 rounded-full ${isHealthy ? "bg-emerald-400 shadow-[0_0_8px_#10B981]" : "bg-amber-400 animate-pulse"}`} />
-                <span>{isHealthy ? "FastAPI Microservice Connected" : "Connecting to 127.0.0.1:8000..."}</span>
+                <span>{isHealthy ? "FastAPI Microservice Connected" : "Connecting to Backend Service..."}</span>
               </div>
             </div>
           </div>
