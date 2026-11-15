@@ -52,6 +52,15 @@ TTS_AUDIO_CONFIG = {
     "sample_width": 2
 }
 
+# Allowed CORS Origins
+# In production unified deployment, frontend is same-origin (/app).
+# For local development or decoupled hosting, origins can be customized via ALLOWED_ORIGINS env var.
+RAW_CORS_ORIGINS = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000,http://127.0.0.1:8000"
+).strip()
+CORS_ORIGINS = [orig.strip() for orig in RAW_CORS_ORIGINS.split(",") if orig.strip()]
+
 
 def get_api_key() -> str:
     """

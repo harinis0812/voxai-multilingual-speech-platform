@@ -10,6 +10,7 @@ import {
   X,
   Sparkles
 } from "lucide-react";
+import { DOCS_URL } from "../api";
 
 export default function Navbar({ activeTab, setActiveTab, isHealthy }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -129,7 +130,7 @@ export default function Navbar({ activeTab, setActiveTab, isHealthy }) {
 
           {/* Swagger API Docs Button */}
           <a
-            href="http://127.0.0.1:8000/docs"
+            href={DOCS_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="hidden sm:inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 border border-purple-400/30 shadow-glow-sm hover:shadow-glow-md transition-all active:scale-95"
@@ -195,7 +196,7 @@ export default function Navbar({ activeTab, setActiveTab, isHealthy }) {
               </div>
 
               <a
-                href="http://127.0.0.1:8000/docs"
+                href={DOCS_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs font-bold text-purple-300 hover:text-white flex items-center space-x-1"

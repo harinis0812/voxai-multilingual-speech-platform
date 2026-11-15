@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Sparkles
 } from "lucide-react";
+import { DOCS_URL } from "../api";
 
 export default function Footer({ setActiveTab, isHealthy }) {
   const currentYear = new Date().getFullYear();
@@ -125,7 +126,7 @@ export default function Footer({ setActiveTab, isHealthy }) {
               </li>
               <li>
                 <a
-                  href="http://127.0.0.1:8000/docs"
+                  href={DOCS_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-white flex items-center space-x-2 transition-colors group"

@@ -8,7 +8,8 @@ Provides unified REST API for:
 
 from typing import Optional
 import os
-from fastapi import FastAPI, File, UploadFile, Form, status, Response
+from fastapi import FastAPI, File, UploadFile, Form, status, Response, Request
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -24,11 +25,12 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Enable CORS for frontend and cross-origin tools
+# Enable CORS for local development and authorized cross-origin requests
+is_wildcard = "*" in config.CORS_ORIGINS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=["*"] if is_wildcard else config.CORS_ORIGINS,
+    allow_credentials=not is_wildcard,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -85,14 +87,21 @@ class HealthResponse(BaseModel):
 # ENDPOINTS
 # ==============================================================================
 @app.get("/", summary="API Root & Information")
-def root():
+def root(request: Request):
     """
-    Returns welcome information, available endpoints, and documentation links.
+    Redirects browser visitors to /app/ when the compiled frontend build is present.
+    Returns welcome information and documentation links for API clients.
     """
+    accept_header = request.headers.get("accept", "")
+    frontend_dist_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
+    if os.path.exists(frontend_dist_path) and "text/html" in accept_header:
+        return RedirectResponse(url="/app/", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+
     return {
         "message": "Welcome to Gnani AI Voice Services API",
         "version": "1.0.0",
         "documentation": "/docs",
+        "app_ui": "/app",
         "endpoints": {
             "health": {
                 "path": "/health",

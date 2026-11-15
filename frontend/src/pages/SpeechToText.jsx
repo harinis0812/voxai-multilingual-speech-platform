@@ -20,7 +20,7 @@ import {
   Radio,
   Volume2
 } from "lucide-react";
-import { transcribeAudio, fetchSampleAudio } from "../api";
+import { transcribeAudio } from "../api";
 import BipolarWaveform from "../components/BipolarWaveform";
 
 export default function SpeechToText({ addToast }) {
@@ -29,7 +29,6 @@ export default function SpeechToText({ addToast }) {
   const [isDragging, setIsDragging] = useState(false);
   const [language, setLanguage] = useState("indic-auto");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isLoadingSample, setIsLoadingSample] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
@@ -59,14 +58,6 @@ export default function SpeechToText({ addToast }) {
     { code: "mr-IN", label: "Marathi", native: "मराठी" },
   ];
 
-  const sampleAudios = [
-    { label: "Hindi Audio", lang: "hi-IN", key: "hindi" },
-    { label: "Malayalam Audio", lang: "ml-IN", key: "malayalam" },
-    { label: "Tamil Audio", lang: "ta-IN", key: "tamil" },
-    { label: "English Audio", lang: "en-IN", key: "english" },
-    { label: "English recording.wav", lang: "hi-IN", key: "recording", tag: "Mismatch Demo" },
-  ];
-
   // Clean up recording stream & audio URLs on unmount
   useEffect(() => {
     return () => {
@@ -79,31 +70,6 @@ export default function SpeechToText({ addToast }) {
       }
     };
   }, []);
-
-  const handleLoadSample = async (sample) => {
-    setIsLoadingSample(true);
-    setError(null);
-    setResult(null);
-    try {
-      const sampleFile = await fetchSampleAudio(sample.key);
-      processSelectedFile(sampleFile);
-      setLanguage(sample.lang);
-      setActiveInputTab("upload");
-      addToast({
-        type: "info",
-        title: "Benchmark Sample Loaded",
-        message: `Loaded ${sample.label} (${sample.lang}). Ready to transcribe.`,
-      });
-    } catch (err) {
-      addToast({
-        type: "error",
-        title: "Failed to Load Sample",
-        message: err.message,
-      });
-    } finally {
-      setIsLoadingSample(false);
-    }
-  };
 
   // Handle selected file and read duration via HTML5 Audio
   const processSelectedFile = (selectedFile) => {
@@ -357,33 +323,6 @@ export default function SpeechToText({ addToast }) {
         <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-xl bg-[#140C2E] border border-purple-500/30 text-xs font-semibold text-purple-200 shrink-0 shadow-glow-sm">
           <Sparkles className="w-3.5 h-3.5 text-purple-400" />
           <span>Model: prisma-v3.0</span>
-        </div>
-      </div>
-
-      {/* BENCHMARK AUDIO SAMPLE SELECTOR CHIPS */}
-      <div className="glass-panel rounded-2xl p-4 sm:p-5 border border-purple-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
-        <div className="flex items-center space-x-2 text-xs font-bold text-purple-200 shrink-0">
-          <Sparkles className="w-4 h-4 text-purple-400" />
-          <span>Verified Audio Benchmarks:</span>
-        </div>
-
-        <div className="flex items-center space-x-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-          {sampleAudios.map((sample, idx) => (
-            <button
-              key={idx}
-              type="button"
-              disabled={isLoadingSample || isProcessing}
-              onClick={() => handleLoadSample(sample)}
-              className="px-3 py-1.5 rounded-xl bg-purple-900/30 hover:bg-purple-800/40 text-purple-200 hover:text-white border border-purple-500/25 shrink-0 transition-all text-xs font-medium flex items-center space-x-1.5 hover:shadow-glow-sm active:scale-95 disabled:opacity-50"
-            >
-              <span>{sample.label}</span>
-              {sample.tag && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/25 text-amber-300 font-mono border border-amber-500/40">
-                  {sample.tag}
-                </span>
-              )}
-            </button>
-          ))}
         </div>
       </div>
 
