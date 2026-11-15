@@ -364,14 +364,19 @@ export default function TextToSpeech({ addToast }) {
                 <div className="flex items-center space-x-2 pt-2">
                   <input
                     type="range"
-                    min="0.5"
-                    max="2.0"
-                    step="0.25"
+                    min="0.85"
+                    max="1.15"
+                    step="0.05"
                     value={speed}
                     onChange={(e) => setSpeed(parseFloat(e.target.value))}
                     disabled={isSynthesizing}
                     className="w-full accent-purple-400 cursor-pointer h-2 bg-purple-950/60 rounded-lg"
                   />
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-purple-300/50 font-mono">
+                  <span>0.85x</span>
+                  <span>1.0x (Norm)</span>
+                  <span>1.15x</span>
                 </div>
               </div>
             </div>
